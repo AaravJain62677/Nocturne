@@ -1,89 +1,134 @@
-# Sleep Degradation
+# Nocturne
 
-A reproducible research repository for quantifying how much sleep-staging performance changes when using wearable-available signals instead of PSG-derived labels, and how much of the gap can be recovered with stronger models and sensor combinations.
+**Investigating wearable-based sleep staging against polysomnography (PSG) ground truth.**
 
-## Research goals
+Nocturne is a research project exploring how accurately sleep stages can be estimated from wearable-available signals and how model choice and sensor combinations affect performance.
 
-- Compare PSG-derived sleep-stage labels against wearable signal predictions.
-- Measure the performance difference between full PSG and wearable-only inputs.
-- Evaluate whether better modeling and sensor combinations recover a meaningful fraction of the gap.
-- Maintain a clear, reproducible pipeline with explicit stage-label handling and deterministic project configuration.
+The project is designed to keep the research process explicit and reproducible: dataset contracts are validated before unsupported workflows run, sleep-stage labels are handled consistently, and results are not reported unless they have actually been produced.
 
-## Project status
+> **Current status:** Research pipeline under development. The repository contains project configuration, validation contracts, dataset discovery scaffolding, preprocessing components, and automated tests. End-to-end training, real-data evaluation, and research findings should be considered incomplete until they have been run and verified on real recordings.
 
-This repository is in Phase 1: project foundation, validation, canonical stage mapping, and unsupported-operation guardrails. Dataset download, model implementation, and training workflows are intentionally unavailable until later phases.
+## Research Questions
 
-## Local setup
+- How well can wearable-derived signals predict PSG-scored sleep stages?
+- Which sleep stages are most difficult to distinguish from wearable proxies?
+- How do sensor combinations and model families affect performance?
+- How much performance can be recovered through improved modeling and feature selection?
 
-### 1. Create the Python environment
+These are research questions, not established findings. No performance claims are made until experiments have been executed and evaluated.
+
+## Planned Workflow
+
+1. **Dataset ingestion** — inspect and load supported recordings while preserving subject IDs, recording IDs, timestamps, and source metadata.
+2. **Preprocessing** — align PSG labels and wearable signals into 30-second epochs, handle missing or unscored data explicitly, and extract eligible wearable-only features.
+3. **Subject-independent splitting** — keep subjects separate across training, validation, and test partitions to reduce leakage.
+4. **Modeling** — establish simple baselines before evaluating sequence models.
+5. **Evaluation** — report accuracy, Cohen's kappa, macro-F1, per-stage metrics, confusion matrices, and uncertainty where supported by the data.
+6. **Ablation and reporting** — compare sensor configurations and generate reproducible tables and figures from actual experiment outputs.
+
+## Datasets
+
+The project plans to investigate:
+
+- **DREAMT (PhysioNet):** intended as the primary source for paired PSG labels and wearable signals. Its actual local file layout, available channels, sampling rates, access requirements, and annotation format must be verified before real-data processing.
+- **Sleep-EDF (PhysioNet):** a possible source for developing and validating PSG annotation handling. It should not be treated as a wearable-comparison dataset unless suitable paired wearable signals are available.
+
+Dataset access and usage must follow the relevant dataset terms. Raw recordings should remain local and must not be committed to this repository.
+
+## Sleep-Stage Labels
+
+The planned taxonomies are:
+
+- **Five-class:** Wake, N1, N2, N3, REM
+- **Four-class:** Wake, Light (N1 + N2), Deep (N3), REM
+
+Unknown, movement, and unscored annotations must remain explicit or be excluded through a documented policy. They must not be silently converted to Wake.
+
+## Scientific Safeguards
+
+- Split data by subject, not by epoch.
+- Fit learned preprocessing transformations on training data only.
+- Keep PSG/EEG signals as reference labels and evaluation data, not as inputs to wearable-only models.
+- Compute HRV only when valid beat-to-beat intervals are available.
+- Distinguish missing signals from genuine zero-valued measurements.
+- Report sample sizes, exclusions, limitations, and uncertainty.
+- Clearly distinguish synthetic unit tests from validation on real recordings.
+- Do not claim to reproduce proprietary Apple, Fitbit, Garmin, or other commercial sleep-scoring algorithms.
+
+An Empatica E4-based experiment, if supported by the available data, evaluates wearable-signal proxies against PSG. It does not by itself measure the accuracy of commercial smartwatch scores.
+
+## Repository Structure
+
+```text
+.
+├── data/
+│   ├── raw/           # Local source data; not committed
+│   ├── processed/     # Generated processed data; not committed
+│   └── splits/        # Local split artifacts; not committed
+├── notebooks/         # Exploratory or runner notebooks
+├── paper/             # Manuscript drafts
+├── results/
+│   ├── figures/       # Generated figures; not committed by default
+│   └── tables/        # Generated tables; not committed by default
+├── src/
+│   ├── ingest/        # Dataset discovery and loading
+│   ├── preprocessing/ # Epoch alignment and feature preparation
+│   ├── models/        # Model implementations
+│   └── eval/          # Evaluation utilities
+└── tests/             # Automated tests
+```
+
+The exact implemented functionality may evolve; consult the source code and `PROJECT_STATUS.md` for the current implementation status.
+
+## Setup
+
+The project is developed in Python. From the repository root, create and activate a virtual environment:
 
 ```bash
-cd /home/aaravjain62677/projects/sleep-degradation
-python3.12 -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
+pip install -r requirements.txt
 ```
 
-### 2. Install dependencies
+If your environment uses a Python version that is incompatible with a dependency, use a compatible Python version rather than bypassing dependency errors.
+
+## Quality Checks
+
+Run the current lint and test suite:
 
 ```bash
-python -m pip install -r requirements.txt
-```
-
-## Dependency notes
-
-The project intentionally keeps scientific Python and ML tooling minimal while remaining suitable for sleep-staging research.
-
-- `numpy` and `pandas`: tabular preprocessing, feature generation, and dataset inspection.
-- `scikit-learn`: evaluation metrics and validation splits when available.
-- `torch`: deep learning runtime used for model experimentation.
-- `matplotlib` and `seaborn`: plotting for performance summaries and figures.
-- `pytest` and `ruff`: automated validation and linting.
-
-## Activation and usage
-
-```bash
-cd /home/aaravjain62677/projects/sleep-degradation
-source .venv/bin/activate
-python -m src.train --dataset dreamt --model baseline --mode validate --taxonomy standard
-```
-
-The CLI validates the selected dataset, model, taxonomy, and execution mode. `--mode validate` is the supported configuration check in Phase 1.
-
-Training and evaluation are intentionally unavailable in this phase and will stop with a clear error message instead of producing misleading output.
-
-## Testing
-
-```bash
-source .venv/bin/activate
+python -m ruff check src tests
 python -m pytest tests -q
 ```
 
-Optional linting:
+Passing unit tests verifies only the behavior covered by those tests. It does not, by itself, establish that the pipeline has been validated on real DREAMT recordings or that scientific experiments have completed.
 
-```bash
-source .venv/bin/activate
-python -m ruff check src tests
-```
+## Data and Outputs
 
-## Canonical stage handling
+- Place downloaded source files under `data/raw/` locally.
+- Store processed data under `data/processed/`.
+- Store generated experiment outputs under `results/`.
+- Keep credentials, local environment files, virtual environments, and large datasets out of Git.
+- Record configuration, random seeds, software versions, split assignments, and dataset provenance for reproducible runs.
 
-The repository defines a canonical stage mapping that treats stage labels explicitly instead of silently converting unknown values to Wake.
+## Current Limitations
 
-- Known labels: `WAKE`, `N1`, `N2`, `N3`, `REM`
-- Movement and unscored labels remain distinct: `MOVEMENT`, `UNSCORED`
-- Unknown labels are preserved as `UNKNOWN`
-- Empty or missing stage labels raise a `ValueError`
+The repository is under active development. Depending on the current code state, the following may still require implementation or real-data validation:
 
-This prevents label ambiguity from being silently introduced during preprocessing or evaluation.
+- Verified ingestion of actual DREAMT recordings.
+- End-to-end epoch alignment and feature generation.
+- Subject-level training and validation workflows.
+- Baseline and sequence-model training.
+- Evaluation metrics, confidence intervals, and result visualization.
+- Sensor-ablation experiments and manuscript conclusions.
 
-## Notable repository conventions
+Do not interpret planned functionality as completed functionality. Consult `PROJECT_STATUS.md`, the CLI, and test results before running experiments.
 
-- Raw datasets are stored under `data/raw/` and are not committed to Git.
-- Processed data and generated results are under `data/processed/` and `results/` respectively.
-- Paths are created from the repository root rather than the current working directory.
-- Seeds are configured through the shared utilities for Python, NumPy, and PyTorch.
+## License and Dataset Attribution
 
-## Next phase
+An appropriate software license will be added before redistributing this repository.
 
-Phase 2 will add dataset-specific ingestion and modeling workflow definitions, after the repository foundation and validation rules have been reviewed.
+## Project Goal
+
+Nocturne aims to make the limits of wearable-based sleep staging measurable, transparent, and reproducible—without overstating what wearable proxies can infer compared with PSG.
