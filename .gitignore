@@ -1,0 +1,64 @@
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Testing and linting
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Research datasets — never commit raw or processed data
+data/raw/*
+!data/raw/.gitkeep
+
+data/processed/*
+!data/processed/.gitkeep
+
+data/splits/*
+!data/splits/.gitkeep
+
+# Generated experiment results
+results/figures/*
+!results/figures/.gitkeep
+
+results/tables/*
+!results/tables/.gitkeep
+
+results/checkpoints/
+results/logs/
+
+# Model artifacts
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
