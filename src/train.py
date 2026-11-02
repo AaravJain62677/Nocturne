@@ -1,13 +1,11 @@
-"""CLI entry point for the sleep-staging research project.
-
-This Phase 1 foundation validates configuration and exposes unsupported workflows
-with explicit, user-facing errors instead of silently constructing a training run.
-"""
+"""CLI entry point for the sleep-staging research project."""
 
 from __future__ import annotations
 
 import argparse
+import json
 from collections.abc import Sequence
+from pathlib import Path
 
 from src.config import (
     DEFAULT_SEED,
@@ -19,6 +17,13 @@ from src.config import (
     resolve_repo_root,
 )
 from src.experiment import validate_experiment_config
+from src.models import (
+    build_subject_splits,
+    compute_partition_summary,
+    load_preprocessed_artifact,
+    save_split_assignments,
+    train_model,
+)
 from src.utils import configure_logging, get_logger, set_deterministic_seed
 
 logger = get_logger("train")
@@ -70,6 +75,24 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=DEFAULT_SEED,
         help="Deterministic random seed for Python, NumPy, and PyTorch.",
+    )
+    parser.add_argument(
+        "--artifact",
+        type=str,
+        default=None,
+        help="Path to a preprocessed parquet or CSV artifact to train on.",
+    )
+    parser.add_argument(
+        "--feature-group",
+        type=str,
+        default="all",
+        help="Feature group to train on, resolved from the actual artifact schema.",
+    )
+    parser.add_argument(
+        "--split-output-dir",
+        type=str,
+        default=None,
+        help="Optional directory to write subject split assignments and metadata.",
     )
     return parser
 
@@ -138,13 +161,42 @@ def validate_configuration(
     return config
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    """Entry point for the CLI.
+def save_experiment_metadata(
+    output_dir: str | Path,
+    *,
+    dataset: str,
+    model: str,
+    taxonomy: str,
+    sensor_set: str,
+    feature_group: str,
+    seed: int,
+    artifact: str,
+    split_map: dict[str, list[str]],
+    summary: dict[str, dict[str, object]],
+    checkpoint_path: str | Path,
+) -> Path:
+    """Persist experiment metadata alongside split assignments."""
+    output_path = Path(output_dir).expanduser().resolve()
+    output_path.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "dataset": dataset,
+        "model": model,
+        "taxonomy": taxonomy,
+        "sensor_set": sensor_set,
+        "feature_group": feature_group,
+        "seed": seed,
+        "artifact": artifact,
+        "split_map": split_map,
+        "summary": summary,
+        "checkpoint_path": str(checkpoint_path),
+    }
+    metadata_path = output_path / "experiment_metadata.json"
+    metadata_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    return metadata_path
 
-    Returns 0 when validation mode succeeds. Unsupported workflows raise
-    ``SystemExit`` with a clear explanation so the CLI fails gracefully rather than
-    performing hidden or invalid work.
-    """
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Entry point for the CLI. Returns 0 on successful validation or training."""
     parser = build_parser()
     args = parser.parse_args(argv)
     configure_logging()
@@ -166,10 +218,50 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.mode in {"train", "eval"}:
-        raise SystemExit(
-            "Training and evaluation workflows are unavailable in Phase 1; "
-            "use --mode validate to check configuration only."
+        if args.artifact is None:
+            raise SystemExit(
+                "Training and evaluation workflows are unavailable without an explicit "
+                "--artifact path; use --mode validate to check configuration only."
+            )
+
+        artifact = load_preprocessed_artifact(args.artifact)
+        split_map = build_subject_splits(artifact, seed=args.seed)
+        if args.split_output_dir is not None:
+            save_split_assignments(split_map, args.split_output_dir)
+        summary = compute_partition_summary(artifact, split_map)
+        model = train_model(
+            artifact,
+            args.model,
+            feature_group=args.feature_group,
+            label_column="reference_stage",
+            seed=args.seed,
         )
+        checkpoint_path = (
+            Path(args.artifact).resolve().parent / f"{args.model}_checkpoint.json"
+        )
+        model.save_checkpoint(checkpoint_path)
+        if args.split_output_dir is not None:
+            save_experiment_metadata(
+                args.split_output_dir,
+                dataset=args.dataset,
+                model=args.model,
+                taxonomy=args.taxonomy,
+                sensor_set=args.sensor_set,
+                feature_group=args.feature_group,
+                seed=args.seed,
+                artifact=str(Path(args.artifact).resolve()),
+                split_map=split_map,
+                summary=summary,
+                checkpoint_path=checkpoint_path,
+            )
+        logger.info(
+            "Training complete for model=%s feature_group=%s summary=%s checkpoint=%s",
+            args.model,
+            args.feature_group,
+            summary,
+            checkpoint_path,
+        )
+        return 0
 
     parser.error(f"Unsupported mode requested: {args.mode}")
     return 2
