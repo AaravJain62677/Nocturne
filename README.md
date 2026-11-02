@@ -34,7 +34,52 @@ The project plans to investigate:
 - **Sleep-EDF (PhysioNet):** a possible source for developing and validating PSG annotation handling. It should not be treated as a wearable-comparison dataset unless suitable paired wearable signals are available.
 
 Dataset access and usage must follow the relevant dataset terms. Raw recordings should remain local and must not be committed to this repository.
+## Official DREAMT acquisition and access policy
 
+The official DREAMT release is hosted on PhysioNet and is a restricted-access resource. The project documentation on the official page states the following conditions, which must be satisfied before any files are downloaded or processed:
+
+- The resource is hosted at https://physionet.org/content/dreamt/ and is currently published under the restricted health-data policy for PhysioNet.
+- Access is restricted to registered users who complete the required data use agreement and accept the dataset terms.
+- The official dataset license is the PhysioNet Restricted Health Data License 1.5.0; the relevant DUA is the PhysioNet Restricted Health Data Use Agreement 1.5.0.
+- The dataset is not a public open-benchmark release; it requires authenticated access and formal agreement before the files are made available.
+
+To acquire the dataset lawfully:
+
+1. Create or log in to a PhysioNet account at https://physionet.org/login/.
+2. Open the official DREAMT page at https://physionet.org/content/dreamt/.
+3. Review the access policy, license, and DUA, then sign the data use agreement that PhysioNet requires.
+4. Download the official release files only through the authenticated PhysioNet flow after agreement acceptance.
+5. Store files locally under `data/raw/dreamt/` or a project-specific local mirror, never in Git, and never commit credentials.
+
+The repository includes a generic authorized download helper at `src/ingest/dreamt_download.py` for use only after a valid DUA is accepted. It supports resumable downloads and checksum validation, but it intentionally requires the user to provide the official authenticated URL and credentials outside the repository.
+
+## Expected local DREAMT layout
+
+After authorized download, the repository expects a structure like this:
+
+```text
+data/
+├── raw/
+│   └── dreamt/
+│       ├── subject_01/
+│       │   └── record_001/
+│       │       ├── accel_x.csv
+│       │       ├── accel_y.csv
+│       │       ├── accel_z.csv
+│       │       ├── bvp.csv
+│       │       ├── eda.csv
+│       │       ├── temp.csv
+│       │       ├── hr.csv
+│       │       ├── ibi.csv
+│       │       ├── eeg_fpz_cz.csv
+│       │       ├── eeg_pz_oz.csv
+│       │       ├── emg.csv
+│       │       ├── eog.csv
+│       │       └── stage_labels.csv
+│       └── ...
+```
+
+The exact file naming conventions of the official release must be treated as authoritative. The repository does not silently rewrite timestamps or labels to force incompatible files into the synthetic fixture assumptions.
 ## Sleep-Stage Labels
 
 The planned taxonomies are:

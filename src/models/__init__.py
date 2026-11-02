@@ -403,6 +403,12 @@ class DummySleepStageModel(SleepStageModel):
         )
         return self.model.predict(X)
 
+    def predict_proba(self, frame: pd.DataFrame) -> np.ndarray:
+        X = frame[self.feature_columns].fillna(
+            frame[self.feature_columns].median(numeric_only=True)
+        )
+        return self.model.predict_proba(X)
+
 
 class RandomForestSleepStageModel(SleepStageModel):
     """Random forest baseline with reproducible hyperparameters."""
@@ -451,6 +457,12 @@ class RandomForestSleepStageModel(SleepStageModel):
         )
         return self.model.predict(X)
 
+    def predict_proba(self, frame: pd.DataFrame) -> np.ndarray:
+        X = frame[self.feature_columns].fillna(
+            frame[self.feature_columns].median(numeric_only=True)
+        )
+        return self.model.predict_proba(X)
+
 
 class HistGradientSleepStageModel(SleepStageModel):
     """HistGradientBoosting baseline with explicit missing-value handling."""
@@ -498,6 +510,12 @@ class HistGradientSleepStageModel(SleepStageModel):
             frame[self.feature_columns].median(numeric_only=True)
         )
         return self.model.predict(X)
+
+    def predict_proba(self, frame: pd.DataFrame) -> np.ndarray:
+        X = frame[self.feature_columns].fillna(
+            frame[self.feature_columns].median(numeric_only=True)
+        )
+        return self.model.predict_proba(X)
 
 
 class SequenceModelSpec:
@@ -737,6 +755,33 @@ class GRUSleepStageModel(SleepStageModel):
                 pred_index = int(logits.argmax(dim=-1)[-1].item())
                 predictions.append(self.index_to_label.get(pred_index, str(pred_index)))
         return np.asarray(predictions, dtype=object)
+
+    def predict_proba(self, frame: pd.DataFrame) -> np.ndarray:
+        if self.model is None:
+            raise ValueError("GRU model has not been fit yet.")
+        sequences = prepare_sequence_batches(
+            frame,
+            sequence_length=self.spec.sequence_length,
+            feature_columns=self.feature_columns,
+        )
+        if not sequences:
+            return np.empty((0, len(self.index_to_label)), dtype=float)
+        probabilities: list[np.ndarray] = []
+        self.model.eval()
+        with torch.no_grad():
+            for batch in sequences:
+                features = torch.as_tensor(
+                    np.asarray(batch["features"], dtype=np.float32),
+                    dtype=torch.float32,
+                )
+                if features.ndim == 2:
+                    features = features.unsqueeze(0)
+                logits = self.model(features)
+                probs = torch.softmax(logits, dim=-1)
+                probabilities.append(probs[:, -1, :].cpu().numpy())
+        if not probabilities:
+            return np.empty((0, len(self.index_to_label)), dtype=float)
+        return np.concatenate(probabilities, axis=0)
 
     def save_checkpoint(self, path: str | Path) -> dict[str, Any]:
         target = Path(path).expanduser().resolve()
@@ -979,6 +1024,33 @@ class LSTMSleepStageModel(GRUSleepStageModel):
                 pred_index = int(logits.argmax(dim=-1)[-1].item())
                 predictions.append(self.index_to_label.get(pred_index, str(pred_index)))
         return np.asarray(predictions, dtype=object)
+
+    def predict_proba(self, frame: pd.DataFrame) -> np.ndarray:
+        if self.model is None:
+            raise ValueError("LSTM model has not been fit yet.")
+        sequences = prepare_sequence_batches(
+            frame,
+            sequence_length=self.spec.sequence_length,
+            feature_columns=self.feature_columns,
+        )
+        if not sequences:
+            return np.empty((0, len(self.index_to_label)), dtype=float)
+        probabilities: list[np.ndarray] = []
+        self.model.eval()
+        with torch.no_grad():
+            for batch in sequences:
+                features = torch.as_tensor(
+                    np.asarray(batch["features"], dtype=np.float32),
+                    dtype=torch.float32,
+                )
+                if features.ndim == 2:
+                    features = features.unsqueeze(0)
+                logits = self.model(features)
+                probs = torch.softmax(logits, dim=-1)
+                probabilities.append(probs[:, -1, :].cpu().numpy())
+        if not probabilities:
+            return np.empty((0, len(self.index_to_label)), dtype=float)
+        return np.concatenate(probabilities, axis=0)
 
     @classmethod
     def load_checkpoint(cls, path: str | Path) -> LSTMSleepStageModel:

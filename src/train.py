@@ -7,6 +7,9 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
+
 from src.config import (
     DEFAULT_SEED,
     SUPPORTED_DATASETS,
@@ -16,8 +19,16 @@ from src.config import (
     SUPPORTED_TAXONOMIES,
     resolve_repo_root,
 )
+from src.eval import (
+    bootstrap_subject_metrics,
+    compute_subject_level_metrics,
+    evaluate_predictions,
+    write_evaluation_outputs,
+    write_optional_visuals,
+)
 from src.experiment import validate_experiment_config
 from src.models import (
+    SleepStageModel,
     build_subject_splits,
     compute_partition_summary,
     load_preprocessed_artifact,
@@ -93,6 +104,47 @@ def build_parser() -> argparse.ArgumentParser:
         type=str,
         default=None,
         help="Optional directory to write subject split assignments and metadata.",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        type=str,
+        default=None,
+        help="Path to a saved model checkpoint for evaluation mode.",
+    )
+    parser.add_argument(
+        "--split",
+        choices=["train", "val", "test"],
+        default="test",
+        help="Subject split to evaluate when running checkpoint-based evaluation.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Directory to write evaluation artifacts.",
+    )
+    parser.add_argument(
+        "--bootstrap-repetitions",
+        type=int,
+        default=200,
+        help="Number of subject-level bootstrap resamples for the evaluation summary.",
+    )
+    parser.add_argument(
+        "--bootstrap-seed",
+        type=int,
+        default=DEFAULT_SEED,
+        help="Random seed for subject-level bootstrap confidence intervals.",
+    )
+    parser.add_argument(
+        "--ablation",
+        action="store_true",
+        help="Run the canonical seven wearable feature-group ablation analysis.",
+    )
+    parser.add_argument(
+        "--split-map",
+        type=str,
+        default=None,
+        help="Optional JSON file containing subject split assignments to reuse.",
     )
     return parser
 
@@ -195,6 +247,172 @@ def save_experiment_metadata(
     return metadata_path
 
 
+def _load_split_map(artifact: pd.DataFrame, args: argparse.Namespace) -> dict[str, list[str]]:
+    """Load a split map from a file if provided, otherwise derive a reproducible split."""
+    if args.split_map is not None:
+        split_path = Path(args.split_map).expanduser().resolve()
+        if not split_path.exists():
+            raise FileNotFoundError(f"Split map not found: {split_path}")
+        payload = json.loads(split_path.read_text(encoding="utf-8"))
+        if isinstance(payload, list):
+            rows = payload
+            split_map = {"train": [], "val": [], "test": []}
+            for row in rows:
+                split_name = str(row.get("split", "")).lower()
+                subject_id = str(row.get("subject_id", ""))
+                if split_name in split_map and subject_id:
+                    split_map[split_name].append(subject_id)
+            return {key: sorted(value) for key, value in split_map.items()}
+        if isinstance(payload, dict):
+            return {
+                str(key): sorted(str(value) for value in values)
+                for key, values in payload.items()
+            }
+        raise ValueError(
+            f"Unsupported split-map schema in {split_path}: {type(payload)!r}"
+        )
+    return build_subject_splits(artifact, seed=args.seed)
+
+
+def _run_single_checkpoint_eval(args: argparse.Namespace, artifact: pd.DataFrame) -> int:
+    """Evaluate a saved checkpoint on a selected subject split."""
+    if args.checkpoint is None:
+        raise ValueError("Checkpoint-based evaluation requires --checkpoint.")
+    checkpoint_path = Path(args.checkpoint).expanduser().resolve()
+    if not checkpoint_path.exists():
+        raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+
+    split_map = _load_split_map(artifact, args)
+    selected_subjects = sorted({str(subject_id) for subject_id in split_map.get(args.split, [])})
+    if not selected_subjects:
+        raise ValueError(f"Split '{args.split}' is empty; no subjects available for evaluation.")
+
+    split_frame = artifact[artifact["subject_id"].astype(str).isin(selected_subjects)].copy()
+    model = SleepStageModel.load_checkpoint(checkpoint_path)
+    feature_columns = list(getattr(model, "feature_columns", []) or [])
+    if not feature_columns:
+        feature_columns = [
+            column for column in split_frame.columns if str(column).startswith("feature_")
+        ]
+    if not feature_columns:
+        raise ValueError(
+            "The checkpoint does not record usable feature columns for evaluation."
+        )
+    if args.feature_group is not None:
+        selected_columns = [col for col in feature_columns if col in split_frame.columns]
+        if not selected_columns:
+            raise ValueError(
+                "Checkpoint feature columns "
+                f"{feature_columns} are not present in the loaded artifact."
+            )
+        split_frame = split_frame.loc[
+            :,
+            list(dict.fromkeys(selected_columns + ["subject_id", "reference_stage"])),
+        ]
+    feature_frame = (
+        split_frame[feature_columns].copy() if feature_columns else split_frame.copy()
+    )
+    predictions = np.asarray(model.predict(feature_frame), dtype=object)
+    metrics = evaluate_predictions(
+        split_frame["reference_stage"].tolist(),
+        predictions,
+        taxonomy=args.taxonomy,
+    )
+    per_subject = compute_subject_level_metrics(
+        split_frame,
+        predictions,
+        taxonomy=args.taxonomy,
+    )
+    bootstrap_rows = []
+    for metric_name in ["accuracy", "balanced_accuracy", "macro_f1", "weighted_f1"]:
+        score_map = {
+            str(subject_id): float(row[metric_name])
+            for subject_id, row in per_subject.set_index("subject_id").iterrows()
+        }
+        bootstrap_result = bootstrap_subject_metrics(
+            list(score_map.keys()),
+            score_map,
+            n_resamples=max(1, int(args.bootstrap_repetitions)),
+            seed=int(args.bootstrap_seed),
+        )
+        bootstrap_rows.append(
+            {
+                "metric": metric_name,
+                "n_resamples": bootstrap_result["n_resamples"],
+                "seed": bootstrap_result["seed"],
+                "subject_count": bootstrap_result["subject_count"],
+                "bootstrap_mean": bootstrap_result["bootstrap_mean"],
+                "ci_lower_05": bootstrap_result["ci_lower_05"],
+                "ci_upper_95": bootstrap_result["ci_upper_95"],
+            }
+        )
+    bootstrap_frame = pd.DataFrame(bootstrap_rows)
+
+    output_dir = (
+        Path(args.output_dir).expanduser().resolve()
+        if args.output_dir
+        else Path("results") / "experiments" / (
+            f"{args.dataset}_{args.model}_{args.taxonomy}_{args.split}"
+        )
+    )
+    ablation_summary = pd.DataFrame([
+        {
+            "feature_group": args.feature_group or "checkpoint",
+            "model_name": args.model,
+            "split": args.split,
+            "accuracy": metrics["accuracy"],
+            "balanced_accuracy": metrics["balanced_accuracy"],
+            "macro_f1": metrics["macro_f1"],
+            "weighted_f1": metrics["weighted_f1"],
+            "cohens_kappa": metrics["cohens_kappa"],
+            "n_subjects": len(selected_subjects),
+            "n_epochs": int(len(split_frame)),
+        }
+    ])
+
+    metadata = {
+        "dataset": args.dataset,
+        "model_name": args.model,
+        "taxonomy": args.taxonomy,
+        "sensor_set": args.sensor_set,
+        "feature_group": args.feature_group or "checkpoint",
+        "split": args.split,
+        "split_subjects": selected_subjects,
+        "seed": args.seed,
+        "bootstrap_repetitions": int(args.bootstrap_repetitions),
+        "bootstrap_seed": int(args.bootstrap_seed),
+        "checkpoint_path": str(checkpoint_path),
+        "artifact_path": str(Path(args.artifact).expanduser().resolve()),
+        "subject_count": len(selected_subjects),
+        "epoch_count": int(len(split_frame)),
+    }
+    write_evaluation_outputs(
+        output_dir,
+        metrics=metrics,
+        per_subject=per_subject,
+        confusion=np.asarray(metrics["confusion_matrix"], dtype=int),
+        normalized_confusion=np.asarray(metrics["normalized_confusion_matrix"], dtype=float),
+        labels=metrics["labels"],
+        metadata=metadata,
+        ablation_summary=ablation_summary,
+        bootstrap_summary=bootstrap_frame,
+    )
+    write_optional_visuals(
+        output_dir,
+        np.asarray(metrics["confusion_matrix"], dtype=int),
+        metrics["labels"],
+        ablation_summary,
+    )
+    logger.info(
+        "Evaluation complete for model=%s split=%s feature_group=%s output_dir=%s",
+        args.model,
+        args.split,
+        args.feature_group or "checkpoint",
+        output_dir,
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry point for the CLI. Returns 0 on successful validation or training."""
     parser = build_parser()
@@ -225,7 +443,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
 
         artifact = load_preprocessed_artifact(args.artifact)
-        split_map = build_subject_splits(artifact, seed=args.seed)
+        if args.mode == "eval":
+            return _run_single_checkpoint_eval(args, artifact)
+
+        split_map = _load_split_map(artifact, args)
         if args.split_output_dir is not None:
             save_split_assignments(split_map, args.split_output_dir)
         summary = compute_partition_summary(artifact, split_map)

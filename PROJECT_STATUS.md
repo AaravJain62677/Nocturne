@@ -66,6 +66,13 @@ Evidence from the repository:
 - `find data -maxdepth 3 -print` shows only placeholder directories: `data/raw`, `data/processed`, and `data/splits`, each containing only `.gitkeep`.
 - A search under `/home/aaravjain62677` did not reveal a local DREAMT dataset copy.
 
+Official DREAMT access policy:
+
+- The official release is on PhysioNet at https://physionet.org/content/dreamt/.
+- Access is restricted to registered users who sign the dataset-specific DUA and accept the PhysioNet restricted Health Data terms.
+- The dataset is subject to the PhysioNet Restricted Health Data License 1.5.0 and the DUA for that project.
+- The repository therefore does not bypass the access controls or provide direct, unauthorized downloads.
+
 Because the actual recordings are absent, the following actions remain unverified:
 
 - Subject discovery on a real dataset.

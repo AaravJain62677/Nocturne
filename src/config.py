@@ -18,7 +18,15 @@ DEFAULT_SEED: Final[int] = 42
 EPOCH_SECONDS: Final[int] = 30
 
 SUPPORTED_DATASETS: Final[tuple[str, ...]] = ("dreamt", "sleep_edf")
-SUPPORTED_MODELS: Final[tuple[str, ...]] = ("baseline", "hybrid")
+SUPPORTED_MODELS: Final[tuple[str, ...]] = (
+    "baseline",
+    "hybrid",
+    "dummy",
+    "random_forest",
+    "hist_gradient_boosting",
+    "gru",
+    "lstm",
+)
 SUPPORTED_TAXONOMIES: Final[tuple[str, ...]] = ("standard", "secondary")
 SUPPORTED_SENSOR_SETS: Final[tuple[str, ...]] = ("wearable", "psg", "combined")
 SUPPORTED_MODES: Final[tuple[str, ...]] = ("validate", "train", "eval")
