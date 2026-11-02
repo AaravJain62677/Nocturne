@@ -12,6 +12,7 @@ This repository is a Phase 2 validation-and-ingestion milestone for a wearable-v
 - DREAMT discovery and record parsing are validated against synthetic fixtures and real repository-level CLI checks.
 - The dataset-inspection entry point, `python -m src.inspect_data --dataset dreamt ...`, runs successfully on synthetic DREAMT-style records.
 - The synthetic wearable preprocessing artifact now serializes deterministically to Parquet (`.parquet`) with a companion metadata JSON file that records schema, counts, exclusions, and signal availability.
+- The unified synthetic pipeline entry point, `python -m src.pipeline ...`, now runs end-to-end with deterministic artifacts, subject-disjoint splits, training, checkpoint persistence, and evaluation outputs.
 - Project hygiene checks pass: `python -m ruff check src tests` and `python -m pytest tests -q`.
 
 ### Synthetic artifact contract
@@ -154,4 +155,4 @@ Real DREAMT validation remains pending because the repository does not currently
 
 ### Final status
 
-The repository is in a stable synthetic validation state for the preprocessing scaffold. It is not yet ready to claim real DREAMT scientific validity or to proceed to model training without an actual dataset and downstream validation checks.
+The repository is in a stable synthetic validation state for the end-to-end pipeline scaffold. The unified pipeline entry point is verified on synthetic fixtures: it preprocesses artifact data, enforces subject-disjoint splits, trains a model, persists a checkpoint, evaluates predictions, and writes reproducible evaluation artifacts. It is not yet ready to claim real DREAMT scientific validity or to proceed to model training without an actual dataset and downstream validation checks.

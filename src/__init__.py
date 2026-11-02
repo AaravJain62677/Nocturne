@@ -7,11 +7,14 @@ from .contracts import (
     SignalMetadata,
     SubjectRecord,
 )
+from .pipeline import PipelineConfig, run_pipeline
 
 __all__ = [
     "EpochRecord",
     "ExperimentConfig",
+    "PipelineConfig",
     "RecordingRecord",
     "SignalMetadata",
     "SubjectRecord",
+    "run_pipeline",
 ]

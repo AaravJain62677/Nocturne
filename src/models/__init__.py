@@ -165,10 +165,27 @@ def build_subject_splits(
         train_count = 1
         val_count = 1
         test_count = 0
-    elif count == 3:
-        train_count = 2
+    elif count >= 3:
+        # Keep every split populated whenever there are at least three subjects.
+        # This preserves subject-disjoint training/validation/testing while
+        # avoiding a silent empty test partition in small synthetic fixtures.
+        train_count = max(1, count - 2)
         val_count = 1
-        test_count = 0
+        test_count = max(1, count - train_count - val_count)
+        if train_count + val_count + test_count != count:
+            # Rebalance deterministically when the ratio-based default would be
+            # too sparse for the remaining subjects.
+            test_count = count - train_count - val_count
+            if test_count < 1:
+                test_count = 1
+                val_count = count - train_count - test_count
+        if val_count < 1:
+            val_count = 1
+        if test_count < 1:
+            test_count = 1
+        if train_count + val_count + test_count > count:
+            surplus = train_count + val_count + test_count - count
+            train_count = max(1, train_count - surplus)
     else:
         target_train = int(round(count * train_ratio))
         target_val = int(round(count * val_ratio))

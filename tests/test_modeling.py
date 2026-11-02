@@ -67,6 +67,18 @@ def test_subject_split_is_subject_independent_and_deterministic() -> None:
     assert len(set(first["val"]) & set(first["test"])) == 0
 
 
+def test_small_subject_splits_keep_all_partitions_non_empty() -> None:
+    frame = _build_synthetic_artifact_frame().query("subject_id in ['s1', 's2', 's3', 's4']")
+    split_map = build_subject_splits(frame, seed=5)
+
+    assert split_map["train"]
+    assert split_map["val"]
+    assert split_map["test"]
+    assert len(set(split_map["train"]) & set(split_map["val"])) == 0
+    assert len(set(split_map["train"]) & set(split_map["test"])) == 0
+    assert len(set(split_map["val"]) & set(split_map["test"])) == 0
+
+
 def test_excluded_epochs_are_removed_before_split_summary() -> None:
     frame = _build_synthetic_artifact_frame()
     frame.loc[0, "excluded"] = True

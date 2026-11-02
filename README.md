@@ -147,6 +147,23 @@ python -m ruff check src tests
 python -m pytest tests -q
 ```
 
+Verified synthetic workflow entry point:
+
+```bash
+python -m src.pipeline \
+  --dataset dreamt \
+  --model random_forest \
+  --taxonomy standard \
+  --sensor-set wearable \
+  --artifact path/to/synthetic_dreamt_wearable_epochs.parquet \
+  --output-dir results/pipeline \
+  --split-output-dir results/pipeline/splits \
+  --feature-group all_wearable \
+  --split test
+```
+
+The unified pipeline executes the synthetic end-to-end flow: artifact validation, subject split creation, training, checkpoint persistence, and evaluation output generation. It does not claim DREAMT compatibility without a real authorized dataset.
+
 Passing unit tests verifies only the behavior covered by those tests. It does not, by itself, establish that the pipeline has been validated on real DREAMT recordings or that scientific experiments have completed.
 
 ## Data and Outputs
