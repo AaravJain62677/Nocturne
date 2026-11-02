@@ -47,16 +47,21 @@ STAGE_ALIASES: Final[dict[str, str]] = {
     "REMSLEEP": "REM",
     "STAGE R": "REM",
     "SLEEP STAGE R": "REM",
+    "P": "UNKNOWN",
+    "PREP": "UNKNOWN",
+    "PREPARATION": "UNKNOWN",
     "M": "MOVEMENT",
     "MOVEMENT": "MOVEMENT",
     "MOVEMENT TIME": "MOVEMENT",
     "MT": "MOVEMENT",
+    "MISSING": "UNSCORED",
     "UNSCORED": "UNSCORED",
     "UNSCORED/NOT SCORED": "UNSCORED",
     "UNKNOWN": "UNKNOWN",
     "?": "UNKNOWN",
     "NA": "UNKNOWN",
     "N/A": "UNKNOWN",
+    "HEAVY": "UNKNOWN",
 }
 
 SECONDARY_SLEEP_STAGE_MAP: Final[dict[str, str]] = {
@@ -81,7 +86,8 @@ def canonical_sleep_stage(label: str | None) -> str:
 
     Unknown labels are preserved as ``UNKNOWN`` instead of being silently coerced into
     ``WAKE``. Empty or blank labels raise ``ValueError`` to force callers to handle
-    missing or malformed inputs explicitly.
+    missing or malformed inputs explicitly. Unsupported stage names are also treated
+    as malformed data and raise ``ValueError`` so ingestion can fail fast.
     """
     if label is None:
         raise ValueError("Sleep-stage label is missing; received None.")

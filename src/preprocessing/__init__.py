@@ -8,10 +8,15 @@ from src.preprocessing.epoch_segmentation import (
     align_recording_to_epochs,
     canonicalize_stage_labels,
 )
-from src.preprocessing.watch_features import build_wearable_feature_table, compute_hrv_features
+from src.preprocessing.watch_features import (
+    build_wearable_feature_table,
+    compute_hrv_features,
+    extract_wearable_epoch_features,
+)
 
 STANDARD_STAGE_ORDER: tuple[str, ...] = ("WAKE", "N1", "N2", "N3", "REM")
 SECONDARY_STAGE_ORDER: tuple[str, ...] = ("WAKE", "LIGHT", "DEEP", "REM")
+PREPROCESSING_VERSION: str = "synthetic-v0.1.0"
 
 
 def resolve_stage_taxonomy(taxonomy: str) -> tuple[str, ...]:
@@ -50,14 +55,60 @@ def apply_stage_taxonomy(labels: list[str], taxonomy: str) -> list[str]:
     )
 
 
+def build_epoch_dataset(
+    record: dict,
+    epoch_seconds: int = 30,
+    time_origin: float | None = None,
+) -> list[dict[str, object]]:
+    """Construct a synthetic but deterministic epoch dataset from a single record."""
+    aligned = align_recording_to_epochs(
+        record,
+        epoch_seconds=epoch_seconds,
+        time_origin=time_origin,
+    )
+    dataset: list[dict[str, object]] = []
+    for epoch in aligned["epochs"]:
+        features = extract_wearable_epoch_features(
+            record,
+            epoch_index=epoch["epoch_index"],
+            epoch_seconds=epoch_seconds,
+            time_origin=aligned["time_origin"],
+            epoch_start=epoch["epoch_start"],
+            epoch_end=epoch["epoch_end"],
+        )
+        dataset.append(
+            {
+                "subject_id": aligned["subject_id"],
+                "recording_id": aligned["recording_id"],
+                "epoch_start": epoch["epoch_start"],
+                "epoch_end": epoch["epoch_end"],
+                "reference_stage": epoch["reference_stage"],
+                "wearable_features": {
+                    key: value
+                    for key, value in features.items()
+                    if key not in {"modality_availability", "missingness"}
+                },
+                "modality_availability": features["modality_availability"],
+                "missingness": features["missingness"],
+                "excluded": epoch["excluded"],
+                "exclusion_reason": epoch["exclusion_reason"],
+                "preprocessing_version": PREPROCESSING_VERSION,
+            }
+        )
+    return dataset
+
+
 __all__ = [
     "SECONDARY_STAGE_ORDER",
     "STANDARD_STAGE_ORDER",
+    "PREPROCESSING_VERSION",
     "align_recording_to_epochs",
     "apply_stage_taxonomy",
+    "build_epoch_dataset",
     "build_wearable_feature_table",
     "canonicalize_stage_labels",
     "compute_eeg_band_stats",
     "compute_hrv_features",
+    "extract_wearable_epoch_features",
     "resolve_stage_taxonomy",
 ]

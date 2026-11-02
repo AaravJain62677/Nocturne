@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from src.config import (
+    DEFAULT_SEED,
     SUPPORTED_DATASETS,
     SUPPORTED_MODELS,
     SUPPORTED_SENSOR_SETS,
@@ -43,6 +45,57 @@ class ExperimentSpec:
                 f"Unsupported model '{self.model_name}'. "
                 f"Supported values: {', '.join(SUPPORTED_MODELS)}."
             )
+
+
+@dataclass(frozen=True)
+class ExperimentConfig:
+    """Explicit configuration contract for a future experiment run.
+
+    This intentionally remains a lightweight data container and does not perform
+    any training or evaluation work. It keeps all arguments explicit and typed so
+    the repository can evolve without silently drifting into underspecified runs.
+    """
+
+    dataset: str
+    sensor_set: str
+    taxonomy: str
+    model_name: str
+    mode: str = "validate"
+    seed: int = DEFAULT_SEED
+    repo_root: Path | None = None
+
+    def __post_init__(self) -> None:
+        if self.dataset not in SUPPORTED_DATASETS:
+            raise ValueError(
+                f"Unsupported dataset '{self.dataset}'. "
+                f"Supported values: {', '.join(SUPPORTED_DATASETS)}."
+            )
+        if self.sensor_set not in SUPPORTED_SENSOR_SETS:
+            raise ValueError(
+                f"Unsupported sensor set '{self.sensor_set}'. "
+                f"Supported values: {', '.join(SUPPORTED_SENSOR_SETS)}."
+            )
+        if self.taxonomy not in SUPPORTED_TAXONOMIES:
+            raise ValueError(
+                f"Unsupported taxonomy '{self.taxonomy}'. "
+                f"Supported values: {', '.join(SUPPORTED_TAXONOMIES)}."
+            )
+        if self.model_name not in SUPPORTED_MODELS:
+            raise ValueError(
+                f"Unsupported model '{self.model_name}'. "
+                f"Supported values: {', '.join(SUPPORTED_MODELS)}."
+            )
+        if self.seed < 0:
+            raise ValueError(f"Seed must be non-negative; got {self.seed!r}.")
+
+    def to_experiment_spec(self) -> ExperimentSpec:
+        """Convert the typed config into the repository's concrete spec object."""
+        return ExperimentSpec(
+            dataset=self.dataset,
+            sensor_set=self.sensor_set,
+            taxonomy=self.taxonomy,
+            model_name=self.model_name,
+        )
 
 
 def validate_experiment_config(
@@ -93,4 +146,9 @@ def build_experiment_specs(
     ]
 
 
-__all__ = ["ExperimentSpec", "build_experiment_specs", "validate_experiment_config"]
+__all__ = [
+    "ExperimentConfig",
+    "ExperimentSpec",
+    "build_experiment_specs",
+    "validate_experiment_config",
+]

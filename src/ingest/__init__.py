@@ -18,6 +18,7 @@ from src.config import (
     SUPPORTED_DATASETS,
     SUPPORTED_SENSOR_SETS,
 )
+from src.contracts import EpochRecord, RecordingRecord, SignalMetadata, SubjectRecord
 from src.ingest.load_dreamt import DreamtRecord, load_dreamt_dataset
 
 
@@ -176,6 +177,10 @@ __all__ = [
     "DATASET_REGISTRY",
     "DatasetSpec",
     "DreamtRecord",
+    "EpochRecord",
+    "RecordingRecord",
+    "SignalMetadata",
+    "SubjectRecord",
     "get_dataset_spec",
     "load_dataset",
     "validate_dataset_layout",

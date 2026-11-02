@@ -1,5 +1,14 @@
+from pathlib import Path
+
 import pytest
 from src.config import SECONDARY_SLEEP_STAGE_MAP, canonical_sleep_stage
+from src.contracts import (
+    EpochRecord,
+    ExperimentConfig,
+    RecordingRecord,
+    SignalMetadata,
+    SubjectRecord,
+)
 from src.eval import compute_stage_metrics
 from src.experiment import build_experiment_specs
 from src.ingest import (
@@ -97,6 +106,63 @@ def test_evaluation_placeholder_is_explicitly_unavailable() -> None:
 
     with pytest.raises(NotImplementedError, match="not implemented|unavailable"):
         compute_stage_metrics([], [], "standard")
+
+
+def test_explicit_record_contracts_are_defined_and_typed() -> None:
+    signal = SignalMetadata(
+        name="hr",
+        source="wearable",
+        units="bpm",
+        sampling_rate_hz=1.0,
+        description="heart rate",
+    )
+    subject = SubjectRecord(
+        subject_id="subject_01",
+        dataset="dreamt",
+        recording_ids=("record_001",),
+        wearable_signals=("accel_x", "accel_y", "accel_z", "hr"),
+        psg_signals=("eeg_fpz_cz", "eeg_pz_oz"),
+    )
+    recording = RecordingRecord(
+        subject_id="subject_01",
+        recording_id="record_001",
+        dataset="dreamt",
+        source_dir=Path("/tmp/record_001"),
+        available_modalities=("hr", "accel_x"),
+        sensor_set="wearable",
+    )
+    epoch = EpochRecord(
+        subject_id="subject_01",
+        recording_id="record_001",
+        epoch_index=0,
+        timestamp="0",
+        stage_label="WAKE",
+        wearable_features={"hr_mean": 60.0},
+        excluded=False,
+    )
+    config = ExperimentConfig(
+        dataset="dreamt",
+        sensor_set="wearable",
+        taxonomy="standard",
+        model_name="baseline",
+        mode="validate",
+        seed=7,
+        repo_root=Path("/tmp/repo"),
+    )
+
+    assert signal.source == "wearable"
+    assert subject.recording_ids == ("record_001",)
+    assert recording.available_modalities == ("hr", "accel_x")
+    assert epoch.stage_label == "WAKE"
+    assert config.seed == 7
+
+    with pytest.raises(ValueError, match="Unsupported dataset|unsupported"):
+        ExperimentConfig(
+            dataset="not-real",
+            sensor_set="wearable",
+            taxonomy="standard",
+            model_name="baseline",
+        )
 
 
 def test_unknown_label_is_not_coerced_to_wake() -> None:

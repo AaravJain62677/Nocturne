@@ -7,6 +7,7 @@ from src.ingest.load_dreamt import (
     load_dreamt_record,
     validate_dreamt_layout,
 )
+from src.inspect_data import inspect_dataset
 
 
 def _write_text(path, content: str) -> None:
@@ -136,3 +137,14 @@ def test_load_dataset_accepts_dreamt_fixture_directory(tmp_path) -> None:
 
     assert len(loaded) == 1
     assert loaded[0].recording_id == record_dir.name
+
+
+def test_inspect_dataset_reports_record_count_and_modalities(tmp_path) -> None:
+    _make_dreamt_record(tmp_path)
+
+    summary = inspect_dataset("dreamt", data_dir=tmp_path)
+
+    assert summary["dataset"] == "dreamt"
+    assert summary["record_count"] == 1
+    assert "accel_x" in summary["modalities"]
+    assert "hr" in summary["modalities"]
