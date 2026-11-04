@@ -33,13 +33,21 @@ from src.models import (
     save_split_assignments,
     train_model,
 )
-from src.preprocess import preprocess_dataset
+from src.preprocess import (
+    SYNTHETIC_DEMONSTRATION_LABEL,
+    _synthetic_demo_payload,
+    preprocess_dataset,
+)
 from src.train import validate_configuration
 
 
 @dataclass(frozen=True, slots=True)
 class PipelineConfig:
-    """Explicit configuration for a synthetic end-to-end pipeline run."""
+    """Explicit configuration for a synthetic end-to-end pipeline run.
+
+    Synthetic demo generation is opt-in and never automatic. Missing real DREAMT
+    data must fail unless the user explicitly requests the demo fallback.
+    """
 
     dataset: str = "dreamt"
     model: str = "random_forest"
@@ -53,10 +61,11 @@ class PipelineConfig:
     feature_group: str = "all_wearable"
     split: str = "test"
     checkpoint: str | Path | None = None
+    synthetic_demo: bool = False
 
 
 def _resolve_artifact_path(config: PipelineConfig) -> Path:
-    """Resolve the preprocessed artifact path or generate one from a local fixture."""
+    """Resolve a real artifact or require an explicit synthetic demo opt-in."""
     if config.artifact is not None:
         artifact_path = Path(config.artifact).expanduser().resolve()
         if artifact_path.exists():
@@ -65,11 +74,54 @@ def _resolve_artifact_path(config: PipelineConfig) -> Path:
 
     if config.data_dir is not None:
         dataset_dir = Path(config.data_dir).expanduser().resolve()
-        payload = preprocess_dataset(
-            dataset=config.dataset,
-            data_dir=dataset_dir,
-            output_dir=Path(config.output_dir).expanduser().resolve() / "processed",
-        )
+        real_pattern_files = [
+            path for path in dataset_dir.rglob("*")
+            if path.is_file() and path.name not in {".gitkeep", ".DS_Store"}
+        ]
+        if not real_pattern_files:
+            if not config.synthetic_demo:
+                raise FileNotFoundError(
+                    f"No valid DREAMT recordings were found in '{dataset_dir}'. "
+                    "Supply a real DREAMT dataset or rerun with --synthetic-demo to generate "
+                    "a deterministic synthetic demonstration fixture."
+                )
+            demo_output_dir = Path(config.output_dir).expanduser().resolve() / "processed"
+            payload = _synthetic_demo_payload(
+                data_dir=dataset_dir,
+                output_dir=demo_output_dir,
+                seed=int(config.seed),
+                subject_count=6,
+                recordings_per_subject=2,
+                epochs_per_record=12,
+            )
+            artifact_path = Path(payload["artifact"]["data_path"]).expanduser().resolve()
+            if artifact_path.exists():
+                return artifact_path
+            raise FileNotFoundError(f"Generated synthetic artifact not found: {artifact_path}")
+
+        try:
+            payload = preprocess_dataset(
+                dataset=config.dataset,
+                data_dir=dataset_dir,
+                output_dir=Path(config.output_dir).expanduser().resolve() / "processed",
+                synthetic_demo=config.synthetic_demo,
+            )
+        except ValueError as exc:
+            if not config.synthetic_demo:
+                raise ValueError(
+                    f"No valid DREAMT recordings were discovered under '{dataset_dir}'. "
+                    "Provide a real DREAMT dataset or rerun with --synthetic-demo to generate "
+                    "an explicit synthetic demonstration fixture."
+                ) from exc
+            demo_output_dir = Path(config.output_dir).expanduser().resolve() / "processed"
+            payload = _synthetic_demo_payload(
+                data_dir=dataset_dir,
+                output_dir=demo_output_dir,
+                seed=int(config.seed),
+                subject_count=6,
+                recordings_per_subject=2,
+                epochs_per_record=12,
+            )
         artifact_path = Path(payload["artifact"]["data_path"]).expanduser().resolve()
         if artifact_path.exists():
             return artifact_path
@@ -79,8 +131,9 @@ def _resolve_artifact_path(config: PipelineConfig) -> Path:
     if fallback.exists():
         return fallback.resolve()
     raise FileNotFoundError(
-        "No artifact path was supplied and no synthetic data was found in data/processed. "
-        "Provide --artifact or --data-dir."
+        "No artifact path was supplied and no processed data was found. "
+        "Provide --artifact, --data-dir with real DREAMT data, or rerun with --synthetic-demo "
+        "to generate an explicit synthetic demonstration artifact."
     )
 
 
@@ -167,6 +220,11 @@ def run_pipeline(config: PipelineConfig | dict[str, Any] | argparse.Namespace) -
         "selected_split": config.split,
         "selected_subjects": selected_subjects,
         "checkpoint_path": str(checkpoint_path),
+        "synthetic_data_disclaimer": SYNTHETIC_DEMONSTRATION_LABEL,
+        "synthetic_data_generation_method": (
+            "deterministic synthetic demonstration fixture; "
+            "not a real DREAMT dataset"
+        ),
     }
     ablation_summary = pd.DataFrame([
         {
@@ -216,6 +274,11 @@ def run_pipeline(config: PipelineConfig | dict[str, Any] | argparse.Namespace) -
         "prediction_count": int(len(predictions)),
         "metrics": metrics,
         "evaluation_paths": {key: str(path) for key, path in evaluation_paths.items()},
+        "synthetic_data_disclaimer": SYNTHETIC_DEMONSTRATION_LABEL,
+        "synthetic_data_generation_method": (
+            "deterministic synthetic demonstration fixture; "
+            "not a real DREAMT dataset"
+        ),
     }
     pipeline_path = output_dir / "pipeline_summary.json"
     pipeline_path.write_text(
@@ -230,8 +293,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Run the synthetic Nocturne workflow end-to-end: preprocess, split, train, "
-            "checkpoint, and evaluate. The individual CLI commands are preserved and "
-            "this interface is provided as a single orchestration wrapper."
+            "checkpoint, and evaluate. Synthetic demo generation is explicit and must be "
+            "requested with --synthetic-demo; it is never substituted automatically for "
+            "missing real DREAMT recordings."
         )
     )
     parser.add_argument(
@@ -269,8 +333,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--data-dir",
         default=None,
         help=(
-            "Directory used to generate a synthetic artifact if no artifact is "
-            "supplied."
+            "Directory containing DREAMT recordings to preprocess. If no real data is found, "
+            "the run fails unless --synthetic-demo is set explicitly."
+        ),
+    )
+    parser.add_argument(
+        "--synthetic-demo",
+        action="store_true",
+        help=(
+            "Generate a deterministic synthetic demonstration artifact for DREAMT-style "
+            "validation. This flag is required for synthetic fallback and is never automatic."
         ),
     )
     parser.add_argument(
@@ -320,6 +392,7 @@ def main(argv: list[str] | None = None) -> int:
             feature_group=args.feature_group,
             split=args.split,
             checkpoint=args.checkpoint,
+            synthetic_demo=args.synthetic_demo,
         ))
     except (FileNotFoundError, NotImplementedError, ValueError) as exc:
         parser.exit(status=2, message=f"Pipeline error: {exc}\n")

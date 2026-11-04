@@ -1,0 +1,236 @@
+{
+  "artifact_path": "/home/aaravjain62677/projects/nocturne/results/synthetic_demo/processed/synthetic_demo_dreamt_wearable_epochs.parquet",
+  "checkpoint_path": "/home/aaravjain62677/projects/nocturne/results/synthetic_demo/random_forest_checkpoint.json",
+  "dataset": "dreamt",
+  "evaluation_paths": {
+    "ablation": "/home/aaravjain62677/projects/nocturne/results/synthetic_demo/ablation_summary.csv",
+    "bootstrap": "/home/aaravjain62677/projects/nocturne/results/synthetic_demo/bootstrap_results.csv",
+    "confusion": "/home/aaravjain62677/projects/nocturne/results/synthetic_demo/confusion_matrix.csv",
+    "metadata": "/home/aaravjain62677/projects/nocturne/results/synthetic_demo/evaluation_metadata.json",
+    "metrics": "/home/aaravjain62677/projects/nocturne/results/synthetic_demo/metrics.json",
+    "metrics_csv": "/home/aaravjain62677/projects/nocturne/results/synthetic_demo/metrics.csv",
+    "normalized_confusion": "/home/aaravjain62677/projects/nocturne/results/synthetic_demo/normalized_confusion_matrix.csv",
+    "per_subject": "/home/aaravjain62677/projects/nocturne/results/synthetic_demo/per_subject_metrics.csv"
+  },
+  "feature_columns": [
+    "feature_accel_magnitude_mean",
+    "feature_accel_magnitude_std",
+    "feature_accel_valid_count",
+    "feature_accel_x_mean",
+    "feature_accel_x_std",
+    "feature_accel_y_mean",
+    "feature_accel_y_std",
+    "feature_accel_z_mean",
+    "feature_accel_z_std",
+    "feature_eda_max",
+    "feature_eda_mean",
+    "feature_eda_min",
+    "feature_eda_phasic_mean",
+    "feature_eda_std",
+    "feature_eda_tonic_mean",
+    "feature_eda_valid_count",
+    "feature_hr_max",
+    "feature_hr_mean",
+    "feature_hr_median",
+    "feature_hr_min",
+    "feature_hr_std",
+    "feature_hr_valid_count",
+    "feature_hrv_available",
+    "feature_hrv_rmssd",
+    "feature_hrv_sdnn",
+    "feature_movement_intensity"
+  ],
+  "feature_group": "all_wearable",
+  "metrics": {
+    "accuracy": 0.25,
+    "balanced_accuracy": 0.24,
+    "cohens_kappa": 0.056768558951964976,
+    "confusion_matrix": [
+      [
+        5,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        6,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        3,
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        2,
+        0,
+        1
+      ],
+      [
+        4,
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "labels": [
+      "WAKE",
+      "N1",
+      "N2",
+      "N3",
+      "REM"
+    ],
+    "macro_f1": 0.13333333333333336,
+    "normalized_confusion_matrix": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.6,
+        0.0,
+        0.2,
+        0.0,
+        0.2
+      ],
+      [
+        0.25,
+        0.0,
+        0.5,
+        0.0,
+        0.25
+      ],
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    ],
+    "per_class": {
+      "N1": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 6
+      },
+      "N2": {
+        "f1": 0.25,
+        "precision": 0.3333333333333333,
+        "recall": 0.2,
+        "support": 5
+      },
+      "N3": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 4
+      },
+      "REM": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 4
+      },
+      "WAKE": {
+        "f1": 0.4166666666666667,
+        "precision": 0.2631578947368421,
+        "recall": 1.0,
+        "support": 5
+      }
+    },
+    "removed_labels": {},
+    "support": {
+      "N1": 6,
+      "N2": 5,
+      "N3": 4,
+      "REM": 4,
+      "WAKE": 5
+    },
+    "taxonomy": "standard",
+    "weighted_f1": 0.1388888888888889
+  },
+  "model": "random_forest",
+  "partition_summary": {
+    "test": {
+      "class_counts": {
+        "N1": 6,
+        "N2": 5,
+        "N3": 4,
+        "REM": 4,
+        "WAKE": 5
+      },
+      "epochs": 24,
+      "recordings": 2,
+      "subjects": 1
+    },
+    "train": {
+      "class_counts": {
+        "N1": 19,
+        "N2": 18,
+        "N3": 19,
+        "REM": 20,
+        "WAKE": 20
+      },
+      "epochs": 96,
+      "recordings": 2,
+      "subjects": 4
+    },
+    "val": {
+      "class_counts": {
+        "N1": 5,
+        "N2": 6,
+        "N3": 5,
+        "REM": 4,
+        "WAKE": 4
+      },
+      "epochs": 24,
+      "recordings": 2,
+      "subjects": 1
+    }
+  },
+  "prediction_count": 24,
+  "seed": 42,
+  "selected_split": "test",
+  "selected_subjects": [
+    "synthetic_s1"
+  ],
+  "sensor_set": "wearable",
+  "split_map": {
+    "test": [
+      "synthetic_s1"
+    ],
+    "train": [
+      "synthetic_s3",
+      "synthetic_s4",
+      "synthetic_s5",
+      "synthetic_s6"
+    ],
+    "val": [
+      "synthetic_s2"
+    ]
+  },
+  "synthetic_data_disclaimer": "SYNTHETIC DEMONSTRATION \u2014 NOT REAL DREAMT RESULTS",
+  "synthetic_data_generation_method": "deterministic synthetic demonstration fixture; not a real DREAMT dataset",
+  "taxonomy": "standard"
+}

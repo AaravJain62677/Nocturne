@@ -13,6 +13,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from src.config import SUPPORTED_DATASETS
@@ -46,6 +47,184 @@ FEATURE_DEFINITIONS: dict[str, str] = {
     "eda_tonic_mean": "Median EDA value used as a tonic baseline estimate.",
     "eda_phasic_mean": "Mean positive deviation from tonic EDA over the epoch.",
 }
+SYNTHETIC_DEMONSTRATION_LABEL = "SYNTHETIC DEMONSTRATION — NOT REAL DREAMT RESULTS"
+SYNTHETIC_STAGE_ORDER: tuple[str, ...] = ("WAKE", "N1", "N2", "N3", "REM")
+
+
+def generate_synthetic_demo_records(
+    *,
+    seed: int = 42,
+    subject_count: int = 6,
+    recordings_per_subject: int = 2,
+    epochs_per_record: int = 12,
+) -> list[dict[str, object]]:
+    """Create a deterministic synthetic demonstration record set for pipeline tests.
+
+    This is intentionally labelled as a demonstration utility and cannot be used to
+    claim real DREAMT performance. The output follows the same epoch schema that the
+    legitimate preprocessing pipeline expects.
+    """
+    rng = np.random.default_rng(int(seed))
+    records: list[dict[str, object]] = []
+    stage_offsets = {
+        "WAKE": 0.0,
+        "N1": 4.0,
+        "N2": 6.0,
+        "N3": 9.0,
+        "REM": 3.0,
+    }
+    for subject_index in range(int(subject_count)):
+        for recording_index in range(int(recordings_per_subject)):
+            epochs: list[dict[str, object]] = []
+            for epoch_index in range(int(epochs_per_record)):
+                stage_index = (subject_index + recording_index + epoch_index) % len(
+                    SYNTHETIC_STAGE_ORDER
+                )
+                stage = SYNTHETIC_STAGE_ORDER[stage_index]
+                phase = epoch_index * 30.0
+                base_hr = (
+                    58.0
+                    + subject_index * 2.5
+                    + recording_index * 1.5
+                    + stage_offsets[stage]
+                    + rng.normal(0.0, 2.5)
+                )
+                hrv = (
+                    32.0
+                    + subject_index * 2.0
+                    + ("REM" == stage) * 8.0
+                    + rng.normal(0.0, 4.0)
+                )
+                accel_x = rng.normal(0.1, 0.08)
+                accel_y = rng.normal(0.15, 0.09)
+                accel_z = rng.normal(0.2, 0.1)
+                accel_mag = float(np.sqrt(accel_x**2 + accel_y**2 + accel_z**2))
+                eda = max(2.0, 3.2 + subject_index * 0.3 + rng.normal(0.0, 0.7))
+                modality_availability = {
+                    "hr": True,
+                    "ibi": True,
+                    "accel_x": True,
+                    "accel_y": True,
+                    "accel_z": True,
+                    "eda": True,
+                }
+                missingness = {
+                    "hr": (
+                        0.0
+                        if (subject_index + recording_index + epoch_index) % 9
+                        else 0.25
+                    ),
+                    "accel": (
+                        0.0
+                        if (subject_index + recording_index + epoch_index) % 11
+                        else 0.2
+                    ),
+                    "eda": (
+                        0.0
+                        if (subject_index + recording_index + epoch_index) % 13
+                        else 0.18
+                    ),
+                }
+                epoch = {
+                    "epoch_index": epoch_index,
+                    "epoch_start": float(phase),
+                    "epoch_end": float(phase + 30.0),
+                    "reference_stage": stage,
+                    "excluded": False,
+                    "exclusion_reason": "",
+                    "wearable_features": {
+                        "hr_mean": float(base_hr),
+                        "hr_median": float(base_hr),
+                        "hr_std": 5.0,
+                        "hr_min": float(max(40.0, base_hr - 12.0)),
+                        "hr_max": float(base_hr + 12.0),
+                        "hr_valid_count": 30,
+                        "hrv_available": True,
+                        "hrv_rmssd": float(max(4.0, hrv)),
+                        "hrv_sdnn": float(max(6.0, hrv * 1.2)),
+                        "accel_x_mean": float(accel_x),
+                        "accel_y_mean": float(accel_y),
+                        "accel_z_mean": float(accel_z),
+                        "accel_x_std": 0.04,
+                        "accel_y_std": 0.05,
+                        "accel_z_std": 0.06,
+                        "accel_magnitude_mean": float(accel_mag),
+                        "accel_magnitude_std": 0.08,
+                        "movement_intensity": float(max(0.03, accel_mag)),
+                        "accel_valid_count": 30,
+                        "eda_mean": float(eda),
+                        "eda_std": 0.5,
+                        "eda_min": float(max(0.0, eda - 1.5)),
+                        "eda_max": float(eda + 1.5),
+                        "eda_valid_count": 30,
+                        "eda_tonic_mean": float(eda * 0.9),
+                        "eda_phasic_mean": float(max(0.05, eda * 0.12)),
+                    },
+                    "modality_availability": modality_availability,
+                    "missingness": missingness,
+                }
+                epochs.append(epoch)
+            records.append({
+                "subject_id": f"synthetic_s{subject_index + 1}",
+                "recording_id": f"rec_{recording_index + 1}",
+                "epochs": epochs,
+            })
+    return records
+
+
+def _synthetic_demo_payload(
+    *,
+    data_dir: str | Path,
+    output_dir: str | Path,
+    seed: int = 42,
+    subject_count: int = 6,
+    recordings_per_subject: int = 2,
+    epochs_per_record: int = 12,
+) -> dict[str, object]:
+    records = generate_synthetic_demo_records(
+        seed=seed,
+        subject_count=subject_count,
+        recordings_per_subject=recordings_per_subject,
+        epochs_per_record=epochs_per_record,
+    )
+    artifact = generate_wearable_dataset_artifact(
+        records,
+        output_dir=output_dir,
+        dataset_id="synthetic_demo_dreamt",
+        epoch_seconds=30,
+        dataset_config={
+            "sensor_set": "wearable",
+            "taxonomy": "standard",
+            "source_dataset": "dreamt",
+            "synthetic_data": True,
+            "synthetic_data_disclaimer": SYNTHETIC_DEMONSTRATION_LABEL,
+            "synthetic_generation_method": (
+                "deterministic synthetic demonstration fixture; "
+                "not real DREAMT data"
+            ),
+            "random_seed": int(seed),
+            "subject_count": int(subject_count),
+            "recordings_per_subject": int(recordings_per_subject),
+            "epochs_per_record": int(epochs_per_record),
+        },
+    )
+    return {
+        "dataset": "dreamt",
+        "data_dir": str(Path(data_dir).expanduser().resolve()),
+        "output_dir": str(Path(output_dir).expanduser().resolve()),
+        "record_count": len(records),
+        "records": records,
+        "real_data_validation_pending": True,
+        "preprocessing_version": PREPROCESSING_VERSION,
+        "synthetic_data": True,
+        "synthetic_data_disclaimer": SYNTHETIC_DEMONSTRATION_LABEL,
+        "artifact": {
+            "data_path": str(artifact["data_path"]),
+            "metadata_path": str(artifact["metadata_path"]),
+            "format": artifact["format"],
+            "parquet_available": artifact["parquet_available"],
+        },
+      }
 
 
 def _flatten_epoch_rows(record_rows: Sequence[dict[str, object]]) -> list[dict[str, object]]:
@@ -150,9 +329,21 @@ def generate_wearable_dataset_artifact(
     dataset_config: dict[str, object] | None = None,
 ) -> dict[str, str]:
     """Serialize a deterministic wearable-only epoch dataset and metadata artifact."""
+    if not epoch_records:
+        raise ValueError(
+            "Cannot generate a wearable artifact from an empty record collection. "
+            "Provide either a real DREAMT dataset or explicitly generate a "
+            "synthetic demo record set."
+        )
+
     output_path = Path(output_dir).expanduser().resolve()
     output_path.mkdir(parents=True, exist_ok=True)
     rows = _flatten_epoch_rows(epoch_records)
+    if not rows:
+        raise ValueError(
+            "No valid epochs were produced for the wearable artifact. "
+            "This usually means the input data directory is empty or contains no usable recordings."
+        )
     dataframe = pd.DataFrame(rows)
 
     identifiers = [
@@ -211,6 +402,7 @@ def generate_wearable_dataset_artifact(
             dataframe[column_name].sum() if column_name in dataframe.columns else 0
         )
 
+    config = dict(dataset_config or {})
     metadata = {
         "preprocessing_version": PREPROCESSING_VERSION,
         "source_dataset_id": dataset_id,
@@ -218,10 +410,10 @@ def generate_wearable_dataset_artifact(
             "+00:00", "Z"
         ),
         "config": {
-            **(dataset_config or {}),
+            **config,
             "epoch_duration_seconds": epoch_seconds,
-            "sensor_set": (dataset_config or {}).get("sensor_set", "wearable"),
-            "taxonomy": (dataset_config or {}).get("taxonomy", "standard"),
+            "sensor_set": config.get("sensor_set", "wearable"),
+            "taxonomy": config.get("taxonomy", "standard"),
             "include_psg_reference": False,
         },
         "epoch_duration_seconds": epoch_seconds,
@@ -238,6 +430,15 @@ def generate_wearable_dataset_artifact(
         "artifact_path": str(data_path),
         "real_data_validation_pending": True,
         "no_eeg_leakage_guarantee": True,
+        "synthetic_data": bool(config.get("synthetic_data", False)),
+        "synthetic_data_disclaimer": config.get(
+            "synthetic_data_disclaimer",
+            SYNTHETIC_DEMONSTRATION_LABEL,
+        ),
+        "synthetic_generation_method": config.get(
+            "synthetic_generation_method",
+            "deterministic synthetic demonstration fixture; not real DREAMT data",
+        ),
     }
     metadata_path.write_text(json.dumps(metadata, indent=2, sort_keys=True), encoding="utf-8")
 
@@ -253,8 +454,13 @@ def preprocess_dataset(
     dataset: str,
     data_dir: str | Path | None = None,
     output_dir: str | Path | None = None,
+    synthetic_demo: bool = False,
 ) -> dict[str, object]:
-    """Construct a synthetic epoch dataset for a supported dataset."""
+    """Construct a DREAMT artifact or an explicit synthetic demo only when requested.
+
+    Synthetic observations are never substituted automatically for missing real
+    DREAMT data. The caller must opt in via synthetic_demo=True.
+    """
     if dataset not in SUPPORTED_DATASETS:
         raise ValueError(
             f"Unsupported dataset '{dataset}'. Supported values: {', '.join(SUPPORTED_DATASETS)}."
@@ -323,6 +529,35 @@ def preprocess_dataset(
                     "epochs": build_epoch_dataset(record, epoch_seconds=30),
                 })
 
+    if not records:
+        if not synthetic_demo:
+            raise ValueError(
+                f"No valid recordings were discovered under '{source_dir}'. "
+                "This repository does not contain a real DREAMT dataset in this location. "
+                "Provide an authorized DREAMT dataset or rerun with --synthetic-demo to generate "
+                "an explicit synthetic demonstration fixture."
+            )
+        demo_output_path = output_path if output_path is not None else source_dir / "processed"
+        payload = _synthetic_demo_payload(
+            data_dir=source_dir,
+            output_dir=demo_output_path,
+            seed=42,
+            subject_count=6,
+            recordings_per_subject=2,
+            epochs_per_record=12,
+        )
+        return {
+            **payload,
+            "synthetic_data": True,
+            "synthetic_data_disclaimer": SYNTHETIC_DEMONSTRATION_LABEL,
+            "config": {
+                "epoch_seconds": 30,
+                "sensor_set": "wearable",
+                "taxonomy": "standard",
+                "include_psg_reference": False,
+            },
+        }
+
     artifact = generate_wearable_dataset_artifact(
         records,
         output_dir=output_path,
@@ -364,7 +599,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Construct synthetic epoch-level wearable features for DREAMT-style fixtures. "
-            "Real DREAMT validation remains pending until a real dataset is available."
+            "Real DREAMT validation remains pending until a real dataset is available; "
+            "synthetic generation is opt-in and requires --synthetic-demo."
         )
     )
     parser.add_argument(
@@ -384,6 +620,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory where epoch-level outputs should be written.",
     )
     parser.add_argument(
+        "--synthetic-demo",
+        action="store_true",
+        help=(
+            "Generate a deterministic synthetic DREAMT-style demo when there is no real "
+            "DREAMT data and the caller explicitly opts in."
+        ),
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit JSON instead of a plain-text summary.",
@@ -400,6 +644,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             dataset=args.dataset,
             data_dir=args.data_dir,
             output_dir=args.output_dir,
+            synthetic_demo=args.synthetic_demo,
         )
     except (FileNotFoundError, NotImplementedError, ValueError) as exc:
         parser.exit(status=2, message=f"Preprocessing error: {exc}\n")
@@ -417,4 +662,10 @@ if __name__ == "__main__":
     raise SystemExit(main())
 
 
-__all__ = ["main", "preprocess_dataset"]
+__all__ = [
+    "SYNTHETIC_DEMONSTRATION_LABEL",
+    "generate_synthetic_demo_records",
+    "main",
+    "preprocess_dataset",
+    "_synthetic_demo_payload",
+]

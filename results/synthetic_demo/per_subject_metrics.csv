@@ -1,0 +1,2 @@
+subject_id,n_epochs,accuracy,balanced_accuracy,macro_f1,weighted_f1,cohens_kappa
+synthetic_s1,24,0.25,0.24,0.13333333333333336,0.1388888888888889,0.056768558951964976

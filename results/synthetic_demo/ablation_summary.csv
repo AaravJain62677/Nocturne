@@ -1,0 +1,2 @@
+feature_group,model_name,split,accuracy,balanced_accuracy,macro_f1,weighted_f1,cohens_kappa,n_subjects,n_epochs
+all_wearable,random_forest,test,0.25,0.24,0.13333333333333336,0.1388888888888889,0.056768558951964976,1,24

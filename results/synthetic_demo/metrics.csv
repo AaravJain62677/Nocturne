@@ -1,0 +1,6 @@
+metric,value
+accuracy,0.25
+balanced_accuracy,0.24
+macro_f1,0.13333333333333336
+weighted_f1,0.1388888888888889
+cohens_kappa,0.056768558951964976

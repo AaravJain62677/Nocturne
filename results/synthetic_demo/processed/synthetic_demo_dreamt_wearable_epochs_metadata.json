@@ -1,0 +1,208 @@
+{
+  "artifact_format": "parquet",
+  "artifact_path": "/home/aaravjain62677/projects/nocturne/results/synthetic_demo/processed/synthetic_demo_dreamt_wearable_epochs.parquet",
+  "config": {
+    "epoch_duration_seconds": 30,
+    "epochs_per_record": 12,
+    "include_psg_reference": false,
+    "random_seed": 42,
+    "recordings_per_subject": 2,
+    "sensor_set": "wearable",
+    "source_dataset": "dreamt",
+    "subject_count": 6,
+    "synthetic_data": true,
+    "synthetic_data_disclaimer": "SYNTHETIC DEMONSTRATION \u2014 NOT REAL DREAMT RESULTS",
+    "synthetic_generation_method": "deterministic synthetic demonstration fixture; not real DREAMT data",
+    "taxonomy": "standard"
+  },
+  "counts": {
+    "epochs": 144,
+    "excluded_epochs": 0,
+    "recordings": 2,
+    "subjects": 6
+  },
+  "epoch_duration_seconds": 30,
+  "excluded_epoch_counts": {},
+  "feature_schema": {
+    "epoch_end": {
+      "definition": "Epoch end time in seconds.",
+      "dtype": "float"
+    },
+    "epoch_index": {
+      "definition": "Zero-based epoch index.",
+      "dtype": "int64"
+    },
+    "epoch_start": {
+      "definition": "Epoch start time in seconds.",
+      "dtype": "float"
+    },
+    "excluded": {
+      "definition": "Whether the epoch was excluded.",
+      "dtype": "bool"
+    },
+    "exclusion_reason": {
+      "definition": "Reason the epoch was excluded.",
+      "dtype": "string"
+    },
+    "feature_accel_magnitude_mean": {
+      "definition": "Mean vector magnitude of the 3-axis accelerometer signal.",
+      "dtype": "float"
+    },
+    "feature_accel_magnitude_std": {
+      "definition": "Std. dev. of vector-magnitude samples over the epoch.",
+      "dtype": "float"
+    },
+    "feature_accel_valid_count": {
+      "definition": "Count of valid accelerometer samples used in the epoch summary.",
+      "dtype": "float"
+    },
+    "feature_accel_x_mean": {
+      "definition": "Mean acceleration along the x-axis in the epoch.",
+      "dtype": "float"
+    },
+    "feature_accel_x_std": {
+      "definition": "Std. dev. of x-axis acceleration samples in the epoch.",
+      "dtype": "float"
+    },
+    "feature_accel_y_mean": {
+      "definition": "Mean acceleration along the y-axis in the epoch.",
+      "dtype": "float"
+    },
+    "feature_accel_y_std": {
+      "definition": "Std. dev. of y-axis acceleration samples in the epoch.",
+      "dtype": "float"
+    },
+    "feature_accel_z_mean": {
+      "definition": "Mean acceleration along the z-axis in the epoch.",
+      "dtype": "float"
+    },
+    "feature_accel_z_std": {
+      "definition": "Std. dev. of z-axis acceleration samples in the epoch.",
+      "dtype": "float"
+    },
+    "feature_eda_max": {
+      "definition": "Maximum electrodermal activity over the epoch.",
+      "dtype": "float"
+    },
+    "feature_eda_mean": {
+      "definition": "Mean electrodermal activity over the epoch.",
+      "dtype": "float"
+    },
+    "feature_eda_min": {
+      "definition": "Minimum electrodermal activity over the epoch.",
+      "dtype": "float"
+    },
+    "feature_eda_phasic_mean": {
+      "definition": "Mean positive deviation from tonic EDA over the epoch.",
+      "dtype": "float"
+    },
+    "feature_eda_std": {
+      "definition": "Std. dev. of electrodermal activity over the epoch.",
+      "dtype": "float"
+    },
+    "feature_eda_tonic_mean": {
+      "definition": "Median EDA value used as a tonic baseline estimate.",
+      "dtype": "float"
+    },
+    "feature_eda_valid_count": {
+      "definition": "Valid EDA samples used in the epoch-level summary.",
+      "dtype": "float"
+    },
+    "feature_hr_max": {
+      "definition": "Maximum heart rate in beats per minute over the epoch.",
+      "dtype": "float"
+    },
+    "feature_hr_mean": {
+      "definition": "Average heart rate in beats per minute over the epoch.",
+      "dtype": "float"
+    },
+    "feature_hr_median": {
+      "definition": "Median heart rate in beats per minute over the epoch.",
+      "dtype": "float"
+    },
+    "feature_hr_min": {
+      "definition": "Minimum heart rate in beats per minute over the epoch.",
+      "dtype": "float"
+    },
+    "feature_hr_std": {
+      "definition": "Population standard deviation of heart rate samples in the epoch.",
+      "dtype": "float"
+    },
+    "feature_hr_valid_count": {
+      "definition": "Valid HR samples used in the epoch-level summary.",
+      "dtype": "float"
+    },
+    "feature_hrv_available": {
+      "definition": "Whether RR/IBI-derived HRV is available for the epoch.",
+      "dtype": "float"
+    },
+    "feature_hrv_rmssd": {
+      "definition": "Root-mean-square of successive RR differences in milliseconds.",
+      "dtype": "float"
+    },
+    "feature_hrv_sdnn": {
+      "definition": "Standard deviation of RR intervals in milliseconds.",
+      "dtype": "float"
+    },
+    "feature_movement_intensity": {
+      "definition": "Mean vector magnitude used as a motion-intensity summary.",
+      "dtype": "float"
+    },
+    "modality_available_accel_x": {
+      "definition": "Whether x-axis accelerometer data were available in the epoch.",
+      "dtype": "bool"
+    },
+    "modality_available_accel_y": {
+      "definition": "Whether y-axis accelerometer data were available in the epoch.",
+      "dtype": "bool"
+    },
+    "modality_available_accel_z": {
+      "definition": "Whether z-axis accelerometer data were available in the epoch.",
+      "dtype": "bool"
+    },
+    "modality_available_eda": {
+      "definition": "Whether EDA data were available in the epoch.",
+      "dtype": "bool"
+    },
+    "modality_available_hr": {
+      "definition": "Whether the HR modality was available in the epoch.",
+      "dtype": "bool"
+    },
+    "modality_available_ibi": {
+      "definition": "Whether IBI/RR inputs were available in the epoch.",
+      "dtype": "bool"
+    },
+    "preprocessing_version": {
+      "definition": "Version tag for the synthetic preprocessing logic.",
+      "dtype": "string"
+    },
+    "recording_id": {
+      "definition": "Stable recording identifier.",
+      "dtype": "string"
+    },
+    "reference_stage": {
+      "definition": "Reference sleep-stage target.",
+      "dtype": "string"
+    },
+    "subject_id": {
+      "definition": "Stable subject identifier.",
+      "dtype": "string"
+    }
+  },
+  "generation_timestamp_utc": "2026-11-04T02:44:21.094242Z",
+  "modality_availability": {
+    "accel_x": 144,
+    "accel_y": 144,
+    "accel_z": 144,
+    "eda": 144,
+    "hr": 144,
+    "ibi": 144
+  },
+  "no_eeg_leakage_guarantee": true,
+  "preprocessing_version": "synthetic-v0.1.0",
+  "real_data_validation_pending": true,
+  "source_dataset_id": "synthetic_demo_dreamt",
+  "synthetic_data": true,
+  "synthetic_data_disclaimer": "SYNTHETIC DEMONSTRATION \u2014 NOT REAL DREAMT RESULTS",
+  "synthetic_generation_method": "deterministic synthetic demonstration fixture; not real DREAMT data"
+}

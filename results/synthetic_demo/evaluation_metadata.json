@@ -1,0 +1,30 @@
+{
+  "artifact_path": "/home/aaravjain62677/projects/nocturne/results/synthetic_demo/processed/synthetic_demo_dreamt_wearable_epochs.parquet",
+  "checkpoint_path": "/home/aaravjain62677/projects/nocturne/results/synthetic_demo/random_forest_checkpoint.json",
+  "dataset": "dreamt",
+  "feature_group": "all_wearable",
+  "model": "random_forest",
+  "seed": 42,
+  "selected_split": "test",
+  "selected_subjects": [
+    "synthetic_s1"
+  ],
+  "sensor_set": "wearable",
+  "split_map": {
+    "test": [
+      "synthetic_s1"
+    ],
+    "train": [
+      "synthetic_s3",
+      "synthetic_s4",
+      "synthetic_s5",
+      "synthetic_s6"
+    ],
+    "val": [
+      "synthetic_s2"
+    ]
+  },
+  "synthetic_data_disclaimer": "SYNTHETIC DEMONSTRATION \u2014 NOT REAL DREAMT RESULTS",
+  "synthetic_data_generation_method": "deterministic synthetic demonstration fixture; not a real DREAMT dataset",
+  "taxonomy": "standard"
+}

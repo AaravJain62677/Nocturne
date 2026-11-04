@@ -1,3 +1,4 @@
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -6,7 +7,11 @@ import pandas as pd
 import pytest
 from src.models import RandomForestSleepStageModel
 from src.pipeline import PipelineConfig, run_pipeline
-from src.preprocess import generate_wearable_dataset_artifact
+from src.preprocess import (
+    generate_synthetic_demo_records,
+    generate_wearable_dataset_artifact,
+    preprocess_dataset,
+)
 from src.train import main
 
 
@@ -138,3 +143,79 @@ def test_synthetic_end_to_end_pipeline_runs_without_subject_leakage(
     assert len(summary["metrics"]["labels"]) >= 1
     selected_rows = loaded[loaded["subject_id"].isin(summary["selected_subjects"])]
     assert summary["prediction_count"] == len(selected_rows)
+
+
+def test_preprocess_dataset_rejects_empty_data_dir(tmp_path: Path) -> None:
+    empty_dir = tmp_path / "empty_data"
+    empty_dir.mkdir()
+
+    with pytest.raises(ValueError, match="real DREAMT|--synthetic-demo|No valid recordings"):
+        preprocess_dataset("dreamt", data_dir=empty_dir, output_dir=tmp_path / "empty_output")
+
+
+def test_pipeline_fails_without_synthetic_demo_when_dreamt_missing(tmp_path: Path) -> None:
+    empty_data_dir = tmp_path / "empty_data"
+    empty_data_dir.mkdir()
+
+    with pytest.raises(
+        (FileNotFoundError, ValueError),
+        match="--synthetic-demo|real DREAMT|No valid",
+    ):
+        run_pipeline(PipelineConfig(
+            dataset="dreamt",
+            model="random_forest",
+            taxonomy="standard",
+            sensor_set="wearable",
+            seed=42,
+            data_dir=empty_data_dir,
+            output_dir=tmp_path / "expected_failure",
+            split_output_dir=tmp_path / "expected_failure" / "splits",
+            feature_group="all_wearable",
+            split="test",
+            synthetic_demo=False,
+        ))
+
+
+def test_generate_synthetic_demo_records_are_seeded_and_label_covered() -> None:
+    records_a = generate_synthetic_demo_records(seed=42, subject_count=6)
+    records_b = generate_synthetic_demo_records(seed=42, subject_count=6)
+    records_c = generate_synthetic_demo_records(seed=99, subject_count=6)
+
+    assert len(records_a) >= 6
+    labels = {epoch["reference_stage"] for record in records_a for epoch in record["epochs"]}
+    assert labels == {"WAKE", "N1", "N2", "N3", "REM"}
+    assert records_a == records_b
+    assert records_a != records_c
+
+
+def test_pipeline_runs_on_seeded_synthetic_demo_data(tmp_path: Path) -> None:
+    empty_data_dir = tmp_path / "empty_data"
+    empty_data_dir.mkdir()
+    output_dir = tmp_path / "demo_pipeline"
+
+    summary = run_pipeline(PipelineConfig(
+        dataset="dreamt",
+        model="random_forest",
+        taxonomy="standard",
+        sensor_set="wearable",
+        seed=42,
+        data_dir=empty_data_dir,
+        output_dir=output_dir,
+        split_output_dir=output_dir / "splits",
+        feature_group="all_wearable",
+        split="test",
+        synthetic_demo=True,
+    ))
+
+    assert summary["selected_split"] == "test"
+    assert summary["metrics"]["accuracy"] >= 0.0
+    assert summary["metrics"]["macro_f1"] >= 0.0
+    assert output_dir.joinpath("metrics.json").exists()
+    assert output_dir.joinpath("pipeline_summary.json").exists()
+    assert "SYNTHETIC DEMONSTRATION" in json.dumps(
+        summary,
+        sort_keys=True,
+    ).upper()
+    assert summary["synthetic_data_disclaimer"] == (
+        "SYNTHETIC DEMONSTRATION — NOT REAL DREAMT RESULTS"
+    )

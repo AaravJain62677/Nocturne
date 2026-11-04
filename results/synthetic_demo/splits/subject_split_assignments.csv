@@ -1,0 +1,7 @@
+subject_id,split
+synthetic_s3,train
+synthetic_s4,train
+synthetic_s5,train
+synthetic_s6,train
+synthetic_s2,val
+synthetic_s1,test

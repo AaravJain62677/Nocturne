@@ -476,7 +476,11 @@ def write_optional_visuals(
     plt.close(fig)
     outputs["heatmap"] = path
 
-    if ablation_summary is not None and not ablation_summary.empty:
+    if (
+        ablation_summary is not None
+        and not ablation_summary.empty
+        and ablation_summary["feature_group"].nunique() > 1
+    ):
         fig, ax = plt.subplots(figsize=(7, 4))
         ax.bar(ablation_summary["feature_group"], ablation_summary["macro_f1"], color="steelblue")
         ax.set_ylabel("Macro-F1")

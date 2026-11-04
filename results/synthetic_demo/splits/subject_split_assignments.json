@@ -1,0 +1,26 @@
+[
+  {
+    "split": "train",
+    "subject_id": "synthetic_s3"
+  },
+  {
+    "split": "train",
+    "subject_id": "synthetic_s4"
+  },
+  {
+    "split": "train",
+    "subject_id": "synthetic_s5"
+  },
+  {
+    "split": "train",
+    "subject_id": "synthetic_s6"
+  },
+  {
+    "split": "val",
+    "subject_id": "synthetic_s2"
+  },
+  {
+    "split": "test",
+    "subject_id": "synthetic_s1"
+  }
+]
