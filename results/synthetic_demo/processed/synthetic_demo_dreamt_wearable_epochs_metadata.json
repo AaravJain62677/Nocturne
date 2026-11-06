@@ -1,6 +1,6 @@
 {
   "artifact_format": "parquet",
-  "artifact_path": "/home/aaravjain62677/projects/nocturne/results/synthetic_demo/processed/synthetic_demo_dreamt_wearable_epochs.parquet",
+  "artifact_path": "/home/aaravjain62677/Desktop/Nocturne/Nocturne/results/synthetic_demo/processed/synthetic_demo_dreamt_wearable_epochs.parquet",
   "config": {
     "epoch_duration_seconds": 30,
     "epochs_per_record": 12,
@@ -189,7 +189,7 @@
       "dtype": "string"
     }
   },
-  "generation_timestamp_utc": "2026-11-04T02:44:21.094242Z",
+  "generation_timestamp_utc": "2026-11-06T15:45:03.838392Z",
   "modality_availability": {
     "accel_x": 144,
     "accel_y": 144,

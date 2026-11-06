@@ -1,6 +1,6 @@
 {
-  "artifact_path": "/home/aaravjain62677/projects/nocturne/results/synthetic_demo/processed/synthetic_demo_dreamt_wearable_epochs.parquet",
-  "checkpoint_path": "/home/aaravjain62677/projects/nocturne/results/synthetic_demo/random_forest_checkpoint.json",
+  "artifact_path": "/home/aaravjain62677/Desktop/Nocturne/Nocturne/results/synthetic_demo/processed/synthetic_demo_dreamt_wearable_epochs.parquet",
+  "checkpoint_path": "/home/aaravjain62677/Desktop/Nocturne/Nocturne/results/synthetic_demo/random_forest_checkpoint.json",
   "dataset": "dreamt",
   "feature_group": "all_wearable",
   "model": "random_forest",
