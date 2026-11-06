@@ -1,196 +1,559 @@
 # Nocturne
 
-**Investigating wearable-based sleep staging against polysomnography (PSG) ground truth.**
+### Reproducible Wearable Sleep-Stage Classification
 
-Nocturne is a research project exploring how accurately sleep stages can be estimated from wearable-available signals and how model choice and sensor combinations affect performance.
+Nocturne is a reproducible research framework for evaluating **sleep-stage classification from wearable-derived physiological and motion signals** under a **subject-independent experimental protocol**.
 
-The project is designed to keep the research process explicit and reproducible: dataset contracts are validated before unsupported workflows run, sleep-stage labels are handled consistently, and results are not reported unless they have actually been produced.
+The project is designed around a central research question:
 
-> **Current status:** Research pipeline under development. The repository contains project configuration, validation contracts, dataset discovery scaffolding, preprocessing components, and automated tests. End-to-end training, real-data evaluation, and research findings should be considered incomplete until they have been run and verified on real recordings.
+> **How effectively can wearable-derived physiological and motion features classify sleep stages under subject-independent evaluation, and which signal modalities contribute most to classification performance?**
 
-## Research Questions
+Nocturne provides an end-to-end pipeline covering data ingestion, preprocessing, feature extraction, subject-independent splitting, model training, evaluation, ablation studies, and reproducible experiment artifacts.
 
-- How well can wearable-derived signals predict PSG-scored sleep stages?
-- Which sleep stages are most difficult to distinguish from wearable proxies?
-- How do sensor combinations and model families affect performance?
-- How much performance can be recovered through improved modeling and feature selection?
+---
 
-These are research questions, not established findings. No performance claims are made until experiments have been executed and evaluated.
+## Research Scope
 
-## Planned Workflow
+Sleep-stage classification is commonly performed using polysomnography (PSG), which provides rich physiological signals such as EEG, EOG, and EMG. However, wearable devices offer a more accessible alternative through signals such as:
 
-1. **Dataset ingestion** — inspect and load supported recordings while preserving subject IDs, recording IDs, timestamps, and source metadata.
-2. **Preprocessing** — align PSG labels and wearable signals into 30-second epochs, handle missing or unscored data explicitly, and extract eligible wearable-only features.
-3. **Subject-independent splitting** — keep subjects separate across training, validation, and test partitions to reduce leakage.
-4. **Modeling** — establish simple baselines before evaluating sequence models.
-5. **Evaluation** — report accuracy, Cohen's kappa, macro-F1, per-stage metrics, confusion matrices, and uncertainty where supported by the data.
-6. **Ablation and reporting** — compare sensor configurations and generate reproducible tables and figures from actual experiment outputs.
+- Heart rate
+- Heart-rate variability (HRV)
+- Accelerometer-derived motion
+- Other wearable-compatible physiological signals
 
-## Datasets
+Nocturne investigates how these wearable-derived signals can be used for automated sleep-stage classification while maintaining a strict separation between subjects during training and evaluation.
 
-The project plans to investigate:
+The framework supports both:
 
-- **DREAMT (PhysioNet):** intended as the primary source for paired PSG labels and wearable signals. Its actual local file layout, available channels, sampling rates, access requirements, and annotation format must be verified before real-data processing.
-- **Sleep-EDF (PhysioNet):** a possible source for developing and validating PSG annotation handling. It should not be treated as a wearable-comparison dataset unless suitable paired wearable signals are available.
-
-Dataset access and usage must follow the relevant dataset terms. Raw recordings should remain local and must not be committed to this repository.
-## Official DREAMT acquisition and access policy
-
-The official DREAMT release is hosted on PhysioNet and is a restricted-access resource. The project documentation on the official page states the following conditions, which must be satisfied before any files are downloaded or processed:
-
-- The resource is hosted at https://physionet.org/content/dreamt/ and is currently published under the restricted health-data policy for PhysioNet.
-- Access is restricted to registered users who complete the required data use agreement and accept the dataset terms.
-- The official dataset license is the PhysioNet Restricted Health Data License 1.5.0; the relevant DUA is the PhysioNet Restricted Health Data Use Agreement 1.5.0.
-- The dataset is not a public open-benchmark release; it requires authenticated access and formal agreement before the files are made available.
-
-To acquire the dataset lawfully:
-
-1. Create or log in to a PhysioNet account at https://physionet.org/login/.
-2. Open the official DREAMT page at https://physionet.org/content/dreamt/.
-3. Review the access policy, license, and DUA, then sign the data use agreement that PhysioNet requires.
-4. Download the official release files only through the authenticated PhysioNet flow after agreement acceptance.
-5. Store files locally under `data/raw/dreamt/` or a project-specific local mirror, never in Git, and never commit credentials.
-
-The repository includes a generic authorized download helper at `src/ingest/dreamt_download.py` for use only after a valid DUA is accepted. It supports resumable downloads and checksum validation, but it intentionally requires the user to provide the official authenticated URL and credentials outside the repository.
-
-## Expected local DREAMT layout
-
-After authorized download, the repository expects a structure like this:
+### Five-class sleep staging
 
 ```text
-data/
-├── raw/
-│   └── dreamt/
-│       ├── subject_01/
-│       │   └── record_001/
-│       │       ├── accel_x.csv
-│       │       ├── accel_y.csv
-│       │       ├── accel_z.csv
-│       │       ├── bvp.csv
-│       │       ├── eda.csv
-│       │       ├── temp.csv
-│       │       ├── hr.csv
-│       │       ├── ibi.csv
-│       │       ├── eeg_fpz_cz.csv
-│       │       ├── eeg_pz_oz.csv
-│       │       ├── emg.csv
-│       │       ├── eog.csv
-│       │       └── stage_labels.csv
-│       └── ...
+WAKE
+N1
+N2
+N3
+REM
 ```
 
-The exact file naming conventions of the official release must be treated as authoritative. The repository does not silently rewrite timestamps or labels to force incompatible files into the synthetic fixture assumptions.
-## Sleep-Stage Labels
-
-The planned taxonomies are:
-
-- **Five-class:** Wake, N1, N2, N3, REM
-- **Four-class:** Wake, Light (N1 + N2), Deep (N3), REM
-
-Unknown, movement, and unscored annotations must remain explicit or be excluded through a documented policy. They must not be silently converted to Wake.
-
-## Scientific Safeguards
-
-- Split data by subject, not by epoch.
-- Fit learned preprocessing transformations on training data only.
-- Keep PSG/EEG signals as reference labels and evaluation data, not as inputs to wearable-only models.
-- Compute HRV only when valid beat-to-beat intervals are available.
-- Distinguish missing signals from genuine zero-valued measurements.
-- Report sample sizes, exclusions, limitations, and uncertainty.
-- Clearly distinguish synthetic unit tests from validation on real recordings.
-- Do not claim to reproduce proprietary Apple, Fitbit, Garmin, or other commercial sleep-scoring algorithms.
-
-An Empatica E4-based experiment, if supported by the available data, evaluates wearable-signal proxies against PSG. It does not by itself measure the accuracy of commercial smartwatch scores.
-
-## Repository Structure
+### Four-class sleep staging
 
 ```text
-.
-├── data/
-│   ├── raw/           # Local source data; not committed
-│   ├── processed/     # Generated processed data; not committed
-│   └── splits/        # Local split artifacts; not committed
-├── notebooks/         # Exploratory or runner notebooks
-├── paper/             # Manuscript drafts
-├── results/
-│   ├── figures/       # Generated figures; not committed by default
-│   └── tables/        # Generated tables; not committed by default
-├── src/
-│   ├── ingest/        # Dataset discovery and loading
-│   ├── preprocessing/ # Epoch alignment and feature preparation
-│   ├── models/        # Model implementations
-│   └── eval/          # Evaluation utilities
-└── tests/             # Automated tests
+WAKE
+LIGHT
+DEEP
+REM
 ```
 
-The exact implemented functionality may evolve; consult the source code and `PROJECT_STATUS.md` for the current implementation status.
+---
 
-## Setup
+## Experimental Design
 
-The project is developed in Python. From the repository root, create and activate a virtual environment:
+The primary evaluation protocol uses **subject-independent splits**.
+
+Subjects are assigned to training, validation, and test partitions before model evaluation. This prevents epochs from the same subject appearing across different partitions and reduces the risk of subject-level data leakage.
+
+The primary evaluation metric is:
+
+**Macro-F1**
+
+because sleep-stage datasets can contain substantial class imbalance and macro-averaging gives each sleep stage equal weight.
+
+Additional metrics include:
+
+- Accuracy
+- Balanced Accuracy
+- Weighted F1
+- Cohen's Kappa
+- Per-class precision, recall, and F1
+- Subject-level metrics
+- Confusion matrices
+
+---
+
+## Pipeline
+
+```text
+                 ┌─────────────────────┐
+                 │     DREAMT Data     │
+                 │  / Synthetic Demo   │
+                 └──────────┬──────────┘
+                            │
+                            ▼
+                 ┌─────────────────────┐
+                 │   Data Validation   │
+                 │ & Dataset Ingestion │
+                 └──────────┬──────────┘
+                            │
+                            ▼
+                 ┌─────────────────────┐
+                 │   30-second Epochs  │
+                 └──────────┬──────────┘
+                            │
+                            ▼
+                 ┌─────────────────────┐
+                 │ Wearable Feature    │
+                 │    Extraction       │
+                 └──────────┬──────────┘
+                            │
+                            ▼
+                 ┌─────────────────────┐
+                 │ Subject-Independent │
+                 │       Splits        │
+                 └──────────┬──────────┘
+                            │
+                            ▼
+             ┌──────────────────────────────┐
+             │        Model Training        │
+             │                              │
+             │ RF │ HistGB │ GRU │ LSTM    │
+             └──────────────┬───────────────┘
+                            │
+                            ▼
+                 ┌─────────────────────┐
+                 │     Evaluation      │
+                 │ Metrics / Confusion │
+                 │ / Subject Analysis  │
+                 └──────────┬──────────┘
+                            │
+                            ▼
+                 ┌─────────────────────┐
+                 │ Reproducible Result │
+                 │     Artifacts       │
+                 └─────────────────────┘
+```
+
+---
+
+## Models
+
+The framework includes classical machine-learning baselines and sequence models.
+
+### Classical models
+
+- DummyClassifier
+- Random Forest
+- HistGradientBoosting
+
+### Sequence models
+
+- GRU
+- LSTM
+
+The architecture is intentionally modular so additional models can be evaluated using the same preprocessing and evaluation protocol.
+
+---
+
+## Feature Groups
+
+Nocturne supports feature-group ablation to investigate the contribution of different wearable signal modalities.
+
+Examples include:
+
+| Feature Group | Description |
+|---|---|
+| `hr` | Heart-rate features |
+| `hrv` | Heart-rate variability features |
+| `acceleration` | Motion / accelerometer features |
+| `hr_hrv` | Heart rate + HRV |
+| `hr_acceleration` | Heart rate + acceleration |
+| `all_wearable` | Complete wearable feature set |
+
+This allows the experimental pipeline to answer questions such as whether physiological or motion-derived features contribute more strongly to sleep-stage discrimination.
+
+---
+
+## Dataset
+
+The intended real-world dataset is **DREAMT**.
+
+DREAMT is access restricted, so the repository does **not** include the real dataset.
+
+The project therefore provides an explicit synthetic demonstration mode for validating the complete pipeline without requiring restricted data.
+
+### Important
+
+The synthetic demonstration is **not a substitute for real DREAMT evaluation**.
+
+Any metrics generated using the synthetic dataset are:
+
+> **Pipeline-validation results only — they are not real DREAMT benchmark results.**
+
+No real-data performance claims are made from the included synthetic results.
+
+---
+
+## Installation
+
+### Requirements
+
+- Python 3.10+
+- Git
+- A virtual environment is recommended
+
+Clone the repository:
 
 ```bash
-python3 -m venv .venv
+git clone https://github.com/AaravJain62677/Nocturne.git
+cd Nocturne
+```
+
+Create a virtual environment:
+
+```bash
+python -m venv .venv
+```
+
+Activate it on Linux/macOS:
+
+```bash
 source .venv/bin/activate
-python -m pip install --upgrade pip
+```
+
+On Windows:
+
+```powershell
+.venv\Scripts\activate
+```
+
+Install dependencies:
+
+```bash
 pip install -r requirements.txt
 ```
 
-If your environment uses a Python version that is incompatible with a dependency, use a compatible Python version rather than bypassing dependency errors.
+---
 
-## Quality Checks
+## Run the Synthetic Demonstration
 
-Run the current lint and test suite:
+The synthetic demonstration validates the complete pipeline without requiring access to DREAMT.
 
-```bash
-python -m ruff check src tests
-python -m pytest tests -q
-```
-
-Verified synthetic workflow entry point:
+Run:
 
 ```bash
 python -m src.pipeline \
-  --dataset dreamt \
-  --model random_forest \
-  --taxonomy standard \
-  --sensor-set wearable \
-  --artifact path/to/synthetic_dreamt_wearable_epochs.parquet \
-  --output-dir results/pipeline \
-  --split-output-dir results/pipeline/splits \
-  --feature-group all_wearable \
-  --split test
+    --dataset dreamt \
+    --model random_forest \
+    --taxonomy standard \
+    --sensor-set wearable \
+    --seed 42 \
+    --data-dir data \
+    --output-dir results/synthetic_demo \
+    --split-output-dir results/synthetic_demo/splits \
+    --feature-group all_wearable \
+    --split test \
+    --synthetic-demo
 ```
 
-The unified pipeline executes the synthetic end-to-end flow: artifact validation, subject split creation, training, checkpoint persistence, and evaluation output generation. It does not claim DREAMT compatibility without a real authorized dataset.
+The run generates reproducible evaluation artifacts under:
 
-Passing unit tests verifies only the behavior covered by those tests. It does not, by itself, establish that the pipeline has been validated on real DREAMT recordings or that scientific experiments have completed.
+```text
+results/synthetic_demo/
+```
 
-## Data and Outputs
+including:
 
-- Place downloaded source files under `data/raw/` locally.
-- Store processed data under `data/processed/`.
-- Store generated experiment outputs under `results/`.
-- Keep credentials, local environment files, virtual environments, and large datasets out of Git.
-- Record configuration, random seeds, software versions, split assignments, and dataset provenance for reproducible runs.
+```text
+metrics.json
+confusion_matrix.csv
+normalized_confusion_matrix.csv
+per_subject_metrics.csv
+ablation_summary.csv
+evaluation_metadata.json
+pipeline_summary.json
+random_forest_checkpoint.json
+random_forest_checkpoint.pkl
+```
 
-## Current Limitations
+The synthetic dataset and its provenance metadata are also stored in the results directory.
 
-The repository is under active development. Depending on the current code state, the following may still require implementation or real-data validation:
+---
 
-- Verified ingestion of actual DREAMT recordings.
-- End-to-end epoch alignment and feature generation.
-- Subject-level training and validation workflows.
-- Baseline and sequence-model training.
-- Evaluation metrics, confidence intervals, and result visualization.
-- Sensor-ablation experiments and manuscript conclusions.
+## View Results
 
-Do not interpret planned functionality as completed functionality. Consult `PROJECT_STATUS.md`, the CLI, and test results before running experiments.
+Nocturne includes a lightweight CLI for inspecting an evaluation directory.
 
-## License and Dataset Attribution
+Run:
 
-An appropriate software license will be added before redistributing this repository.
+```bash
+python -m src.cli results results/synthetic_demo
+```
 
-## Project Goal
+The CLI reports:
 
-Nocturne aims to make the limits of wearable-based sleep staging measurable, transparent, and reproducible—without overstating what wearable proxies can infer compared with PSG.
+- Experiment configuration
+- Evaluation metrics
+- Test-set information
+- Subject independence
+- Class coverage
+- Generated artifacts
+- Synthetic-data disclaimer when applicable
+
+Example:
+
+```text
+NOCTURNE
+Reproducible wearable sleep-stage evaluation
+
+Experiment
+──────────
+  Dataset:        DREAMT
+  Model:          random_forest
+  Taxonomy:       standard
+  Sensor set:     wearable
+  Feature group:  all_wearable
+  Seed:            42
+  Split:           test
+
+Metrics
+───────
+  Accuracy             0.2500
+  Balanced Accuracy    0.2400
+  Macro F1             0.1333
+  Weighted F1          0.1389
+  Cohen's Kappa        0.0568
+```
+
+These values are from the **synthetic demonstration** and must not be interpreted as real DREAMT results.
+
+---
+
+## Using Real DREAMT Data
+
+Real DREAMT experiments require authorized access to the dataset.
+
+Once the dataset has been obtained through the appropriate access process, place the data in the expected data directory:
+
+```text
+data/
+```
+
+Then run the pipeline **without** the synthetic demonstration flag.
+
+For example:
+
+```bash
+python -m src.pipeline \
+    --dataset dreamt \
+    --model random_forest \
+    --taxonomy standard \
+    --sensor-set wearable \
+    --seed 42 \
+    --data-dir data \
+    --output-dir results/real_dreamt \
+    --split-output-dir results/real_dreamt/splits \
+    --feature-group all_wearable \
+    --split test
+```
+
+The pipeline intentionally does **not** silently replace missing real data with synthetic data.
+
+If DREAMT is unavailable, the pipeline fails explicitly rather than producing results that could be mistaken for real-data experiments.
+
+---
+
+## Reproducibility
+
+Experiments record configuration and evaluation metadata alongside generated results.
+
+Important reproducibility controls include:
+
+- Explicit random seeds
+- Subject-independent dataset splits
+- Stored split assignments
+- Dataset and experiment metadata
+- Feature-group configuration
+- Model configuration
+- Evaluation configuration
+- Synthetic-data provenance
+- Saved model checkpoints
+- Machine-readable metrics
+
+The project also includes automated tests covering research-critical behavior.
+
+---
+
+## Testing
+
+Run the complete test suite:
+
+```bash
+pytest -q
+```
+
+The current repository passes:
+
+```text
+66 passed
+```
+
+Run linting:
+
+```bash
+ruff check .
+```
+
+Expected result:
+
+```text
+All checks passed!
+```
+
+Some tests intentionally use very small synthetic class distributions, which can produce harmless scikit-learn metric warnings. These warnings do not indicate test failures.
+
+---
+
+## Project Structure
+
+```text
+Nocturne/
+├── data/
+│
+├── docs/
+│   └── architecture.md
+│
+├── results/
+│   ├── figures/
+│   └── tables/
+│
+├── src/
+│   ├── config.py
+│   ├── contracts.py
+│   ├── experiment.py
+│   ├── ingest/
+│   ├── models/
+│   ├── preprocessing/
+│   ├── eval/
+│   ├── inspect_data.py
+│   ├── pipeline.py
+│   ├── preprocess.py
+│   ├── train.py
+│   └── cli.py
+│
+├── tests/
+│
+├── .gitignore
+├── README.md
+├── pyproject.toml
+└── requirements.txt
+```
+
+---
+
+## Evaluation Philosophy
+
+Nocturne is designed around several principles important for reproducible machine-learning research.
+
+### 1. Subject independence
+
+Sleep epochs from the same subject should not be distributed across training and test partitions.
+
+### 2. Explicit synthetic data
+
+Synthetic data is useful for validating software infrastructure, but synthetic performance is not treated as evidence for real-world model performance.
+
+### 3. Reproducibility
+
+Experiment configuration, splits, metrics, and provenance should be preserved alongside results.
+
+### 4. Modular evaluation
+
+Different models and feature groups should be evaluated under the same experimental protocol.
+
+### 5. No hidden fallback
+
+If real DREAMT data is unavailable, the pipeline does not silently substitute synthetic data.
+
+---
+
+## Current Status
+
+| Component | Status |
+|---|---|
+| Data ingestion architecture | Complete |
+| DREAMT validation | Implemented |
+| 30-second epoch processing | Complete |
+| Wearable feature extraction | Complete |
+| Five-class taxonomy | Complete |
+| Four-class taxonomy | Complete |
+| Subject-independent splitting | Complete |
+| Leakage safeguards | Implemented |
+| Random Forest | Complete |
+| HistGradientBoosting | Complete |
+| GRU | Complete |
+| LSTM | Complete |
+| Evaluation metrics | Complete |
+| Subject-level evaluation | Complete |
+| Feature ablation | Complete |
+| Synthetic end-to-end validation | Complete |
+| Reproducibility metadata | Implemented |
+| CLI | Complete |
+| Automated tests | Complete |
+| Real DREAMT experiments | Pending dataset access |
+
+---
+
+## Limitations
+
+The current repository should be interpreted as a **reproducible experimental framework with synthetic end-to-end validation**, rather than as a completed benchmark of wearable sleep-stage classification.
+
+The principal limitation is the absence of accessible real DREAMT data in the repository.
+
+Consequently:
+
+- Synthetic metrics are not real-world performance estimates.
+- No clinical conclusions should be drawn from the synthetic demonstration.
+- Real-data model comparisons remain to be performed.
+- Real-data confidence intervals and statistical analysis remain future experimental work.
+
+---
+
+## Research Roadmap
+
+The next stage of the study, once authorized DREAMT data is available, is to execute the full experimental matrix:
+
+1. Real DREAMT ingestion and validation
+2. Five-class primary evaluation
+3. Four-class secondary evaluation
+4. Multi-model comparison
+5. Feature-group ablations
+6. Multiple random seeds
+7. Subject-level bootstrap confidence intervals
+8. Per-class error analysis
+9. Model comparison tables
+10. Publication-quality figures
+11. Statistical analysis
+12. Final reproducibility manifest
+
+---
+
+## Citation
+
+If you use Nocturne in research, please cite the repository and the associated paper when available.
+
+```bibtex
+@software{nocturne,
+  author = {Aarav Jain},
+  title = {Nocturne: Reproducible Wearable Sleep-Stage Classification},
+  year = {2026},
+  url = {https://github.com/AaravJain62677/Nocturne}
+}
+```
+
+---
+
+## License
+
+See the repository license for terms of use.
+
+---
+
+## Author
+
+**Aarav Jain**
+
+
+GitHub: [AaravJain62677](https://github.com/AaravJain62677)
+
+---
+
+> **Nocturne is built to make wearable sleep-stage experiments reproducible, subject-independent, and explicit about the boundary between software validation and scientific evidence.**
